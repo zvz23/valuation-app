@@ -19,6 +19,7 @@
     "helmet": "^8.1.0",
     "jose": "^6.0.11",
     "jsonwebtoken": "^9.0.2",
+    "tslib": "^2.3.0",
     "lucide-react": "^0.511.0",
     "mongoose": "^8.15.2",
     "next": "15.3.2",
