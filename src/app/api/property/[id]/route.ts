@@ -6,14 +6,14 @@ import mongoose from 'mongoose';
 
 
 
-export async function GET(req: NextRequest, {params}: { params: { id: string } }) {
+export async function GET(req: NextRequest, params: { params: { id: string } }) {
   await connectDB();
   const property = await PropertyValuation.findById(params.id);
   if (!property) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   return NextResponse.json(property);
 }
 
-export async function DELETE(req: NextRequest, {params}: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, params: { params: { id: string } }) {
   await connectDB();
   const deleted = await PropertyValuation.findByIdAndDelete(params.id);
   if (!deleted) {
@@ -22,7 +22,7 @@ export async function DELETE(req: NextRequest, {params}: { params: { id: string 
   return NextResponse.json({ success: true });
 }
 
-export async function PUT(req: NextRequest, {params}: { params: { id: string } }) {
+export async function PUT(req: NextRequest, params: { params: { id: string } }) {
   await connectDB();
   const data = await req.json();
 
