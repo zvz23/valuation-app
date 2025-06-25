@@ -4,28 +4,29 @@ import PropertyValuation from '@/models/PropertyValuation';
 import { propertyValuationValidationSchemas } from '@/models/PropertyValuationSchemas';
 import mongoose from 'mongoose';
 
-
-
-export async function GET(req: NextRequest, params: { params: { id: string } }) {
+export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   await connectDB();
-  const property = await PropertyValuation.findById(params.id);
+  const { id } = await params;
+  const property = await PropertyValuation.findById(id);
   if (!property) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   return NextResponse.json(property);
 }
 
-export async function DELETE(req: NextRequest, params: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   await connectDB();
-  const deleted = await PropertyValuation.findByIdAndDelete(params.id);
+  const { id } = await params;
+  const deleted = await PropertyValuation.findByIdAndDelete(id);
   if (!deleted) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 });
   }
   return NextResponse.json({ success: true });
 }
 
-export async function PUT(req: NextRequest, params: { params: { id: string } }) {
+export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   await connectDB();
+  const { id } = await params;
   const data = await req.json();
-
+  
   for (const [section, schema] of Object.entries(propertyValuationValidationSchemas)) {
     if (data[section]) {
       try {
@@ -40,7 +41,7 @@ export async function PUT(req: NextRequest, params: { params: { id: string } }) 
       }
     }
   }
-
-  const updated = await PropertyValuation.findByIdAndUpdate(params.id, data, { new: true, upsert: true });
+  
+  const updated = await PropertyValuation.findByIdAndUpdate(id, data, { new: true, upsert: true });
   return NextResponse.json(updated);
 }
