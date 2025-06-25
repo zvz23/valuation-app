@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { useParams, useSearchParams } from 'next/navigation';
+import axios from 'axios';
 import { Navigation } from '@/components/Navigation';
 import {
   OverviewSection,
@@ -640,8 +641,9 @@ export default function PropertyValuationForm() {
   const searchParams = useSearchParams();
   const propertyId = params.id as string;
   const isViewMode = searchParams.get('mode') === 'view';
-  
+
   const [mounted, setMounted] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState('overview');
   const [editingSections, setEditingSections] = useState<Set<string>>(new Set());
   const [completedSections, setCompletedSections] = useState<Set<string>>(new Set());
@@ -673,7 +675,8 @@ export default function PropertyValuationForm() {
     watch,
     control,
     trigger,
-    setValue
+    setValue,
+    reset
   } = useForm<PropertyValuationData>({
     mode: 'onChange',
     defaultValues: {
@@ -696,12 +699,37 @@ export default function PropertyValuationForm() {
 
   const watchedData = watch();
 
+  useEffect(() => {
+    setMounted(true);
+    async function fetchData() {
+      setLoading(true);
+      try {
+        const res = await axios.get(`/api/property/${propertyId}`);
+        if (res.data) {
+          reset(res.data);
+        }
+      } catch (e) {
+        // If not found, keep defaults
+      }
+      setLoading(false);
+    }
+    if (propertyId) fetchData();
+  }, [propertyId, reset]);
+
+  useEffect(() => {
+    if (mounted && propertyId) {
+      localStorage.setItem(`property-${propertyId}-stage`, currentStage);
+    }
+  }, [currentStage, propertyId, mounted]);
+
+
+
   const scrollToSection = (sectionId: string) => {
     setActiveSection(sectionId);
     if (mounted) {
       const element = document.getElementById(`section-${sectionId}`);
       if (element) {
-        const headerHeight = 180; // Adjust this value based on your header height (header + stage progress)
+        const headerHeight = 180;
         const elementTop = element.offsetTop - headerHeight;
         window.scrollTo({
           top: elementTop,
@@ -713,7 +741,6 @@ export default function PropertyValuationForm() {
 
   const toggleEditMode = (sectionId: string) => {
     if (isViewMode) return;
-    
     const newEditingSections = new Set(editingSections);
     if (newEditingSections.has(sectionId)) {
       newEditingSections.delete(sectionId);
@@ -729,28 +756,51 @@ export default function PropertyValuationForm() {
       const newEditingSections = new Set(editingSections);
       newEditingSections.delete(sectionId);
       setEditingSections(newEditingSections);
-      
+
       const newCompleted = new Set(completedSections);
       newCompleted.add(sectionId);
       setCompletedSections(newCompleted);
+
+      // Save only the section to DB
+      try {
+        await axios.put(`/api/property/${propertyId}`, {
+          [sectionId]: watchedData[sectionId as keyof PropertyValuationData]
+        });
+      } catch (e) {
+        alert('Failed to save section to database.');
+      }
     }
   };
 
-  const cancelEdit = (sectionId: string) => {
+   const cancelEdit = (sectionId: string) => {
     const newEditingSections = new Set(editingSections);
     newEditingSections.delete(sectionId);
     setEditingSections(newEditingSections);
   };
 
-  const onSave = async (data: PropertyValuationData) => {
-    console.log('Saving data for property:', propertyId, data);
-    alert('Data saved successfully!');
+
+   const onSave = async (data: PropertyValuationData) => {
+    try {
+      await axios.put(`/api/property/${propertyId}`, data);
+      alert('Data saved successfully!');
+    } catch (e) {
+      alert('Failed to save data to database.');
+    }
   };
 
+  // Submit all data to DB (could add status/flag for submission)
   const onSubmit = async (data: PropertyValuationData) => {
-    console.log('Submitting data for property:', propertyId, data);
+  if (!propertyId) {
+    alert('No property ID found. Please create or select a property first.');
+    return;
+  }
+  try {
+    await axios.put(`/api/property/${propertyId}`, data);
     alert('Valuation report submitted successfully!');
-  };
+  } catch (e) {
+    alert('Failed to submit data to database.');
+  }
+};
 
   const handlePreview = () => {
     alert('PDF Preview functionality coming soon...');
@@ -773,7 +823,7 @@ export default function PropertyValuationForm() {
     window.location.href = '/properties';
   };
 
-  if (!mounted) {
+  if (loading || !mounted) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-blue-100 flex items-center justify-center">
         <div className="text-center">

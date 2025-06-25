@@ -4,9 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { Search, Plus, Edit3, Trash2, Eye, Building, FileText, CheckCircle, BarChart3, FileType, Download, Eye as Preview, Sparkles, Home, MapPin, DollarSign, Calendar, User as UserIcon, Shield, Settings, LogOut, ChevronDown } from 'lucide-react';
 import { getCurrentUser, signOut, type User as AuthUser } from '@/lib/auth';
 import { useRouter } from 'next/navigation';
-
+import axios from 'axios';
 interface Property {
-  id: string;
+  _id?: string;
   jobNumber: string;
   address: string;
   propertyValuer: string;
@@ -18,52 +18,12 @@ interface Property {
   marketValue?: string;
 }
 
-// Mock data for demonstration
-const mockProperties: Property[] = [
-  {
-    id: '1',
-    jobNumber: 'VAL001',
-    address: '123 Main Street, Suburb, State',
-    propertyValuer: 'John Smith',
-    dateCreated: '2024-01-15',
-    lastModified: '2024-01-20',
-    status: 'Fillout',
-    clientName: 'ABC Bank',
-    propertyType: 'Residential House',
-    marketValue: '$850,000'
-  },
-  {
-    id: '2',
-    jobNumber: 'VAL002',
-    address: '456 Oak Avenue, Another Suburb, State',
-    propertyValuer: 'Jane Doe',
-    dateCreated: '2024-01-18',
-    lastModified: '2024-01-22',
-    status: 'Market Evidence',
-    clientName: 'XYZ Credit Union',
-    propertyType: 'Unit/Apartment',
-    marketValue: '$520,000'
-  },
-  {
-    id: '3',
-    jobNumber: 'VAL003',
-    address: '789 Pine Road, Cityville, State',
-    propertyValuer: 'Mike Johnson',
-    dateCreated: '2024-01-20',
-    lastModified: '2024-01-20',
-    status: 'Automated Data Collection',
-    clientName: 'Private Client',
-    propertyType: 'Commercial Office',
-    marketValue: '$1,200,000'
-  }
-];
-
 export default function PropertiesPage() {
   const router = useRouter();
   const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [properties, setProperties] = useState<Property[]>(mockProperties);
+  const [properties, setProperties] = useState<Property[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'Automated Data Collection' | 'Fillout' | 'Market Evidence' | 'Check' | 'Revision' | 'Closed'>('all');
   const [selectedProperties, setSelectedProperties] = useState<Set<string>>(new Set());
@@ -117,12 +77,24 @@ export default function PropertiesPage() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
+  useEffect(() => {
+    async function fetchProperties() {
+      try {
+        const res = await axios.get('/api/property');
+        setProperties(res.data);
+      } catch (e) {
+        setProperties([]);
+      }
+    }
+    fetchProperties();
+  }, []);
+
   // Filter properties based on search term and status
   const filteredProperties = properties.filter((property) => {
     const matchesSearch = 
-      property.jobNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      property.propertyValuer.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (property.jobNumber || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (property.address || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (property.propertyValuer || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
       property.clientName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       property.propertyType?.toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -131,9 +103,9 @@ export default function PropertiesPage() {
     return matchesSearch && matchesStatus;
   });
 
-  const handleCreateNew = () => {
-    const newProperty: Property = {
-      id: Date.now().toString(),
+  const handleCreateNew = async () => {
+  try {
+    const newProperty = {
       jobNumber: `VAL${String(properties.length + 1).padStart(3, '0')}`,
       address: '',
       propertyValuer: '',
@@ -141,17 +113,38 @@ export default function PropertiesPage() {
       lastModified: new Date().toISOString().split('T')[0],
       status: 'Automated Data Collection'
     };
-    
-    setProperties([...properties, newProperty]);
-    // Navigate to the property form
-    window.location.href = `/property/${newProperty.id}`;
-  };
+    const csrfRes = await axios.get('/api/csrf', { withCredentials: true });
+    const csrfToken = csrfRes.data.csrfToken;
+    const res = await axios.post('/api/property', newProperty, {
+      headers: {
+        'x-csrf-token': csrfToken,
+      },
+      withCredentials: true,
+    });
+    console.log('Property creation response:', res.data);
+    if (res.data && res.data._id) {
+      setProperties([...properties, res.data]);
+      window.location.href = `/property/${res.data._id}`;
+    } else {
+      alert('Failed to create property: No ID returned.');
+    }
+  } catch (e) {
+    alert('Failed to create property.');
+    console.log(e);
+  }
+};
 
-  const handleDelete = (id: string) => {
+  const handleDelete = async (id: string) => {
     if (confirm('Are you sure you want to delete this property valuation?')) {
-      setProperties(properties.filter(p => p.id !== id));
+      try {
+        await axios.delete(`/api/property/${id}`);
+        setProperties(properties.filter(p => p._id !== id && p._id !== id));
+      } catch (e) {
+        alert('Failed to delete property.');
+      }
     }
   };
+
 
   const handleEdit = (id: string) => {
     window.location.href = `/property/${id}`;
@@ -187,7 +180,7 @@ export default function PropertiesPage() {
     };
 
     setProperties(properties.map(property => {
-      if (selectedProperties.has(property.id)) {
+      if (selectedProperties.has(property._id ?? '')) {
         const nextStatus = stageProgression[property.status as keyof typeof stageProgression];
         return {
           ...property,
@@ -517,10 +510,10 @@ export default function PropertiesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
             {filteredProperties.map((property, index) => (
               <div
-                key={property.id}
+                key={property._id || property._id || index}
                 className="group relative bg-white/80 backdrop-blur-xl rounded-3xl shadow-xl border border-white/30 overflow-hidden transition-all duration-500 hover:shadow-2xl hover:shadow-blue-500/20 transform hover:scale-[1.02] animate-fade-in-up"
                 style={{ animationDelay: `${index * 100}ms` }}
-                onMouseEnter={() => setHoveredCard(property.id)}
+                onMouseEnter={() => setHoveredCard(property._id ?? '')}
                 onMouseLeave={() => setHoveredCard(null)}
               >
                 {/* Blue Glow Effect */}
@@ -530,8 +523,8 @@ export default function PropertiesPage() {
                 <div className="absolute top-4 left-4 z-20">
                   <input
                     type="checkbox"
-                    checked={selectedProperties.has(property.id)}
-                    onChange={() => handleSelectProperty(property.id)}
+                    checked={selectedProperties.has(property._id ?? '' )}
+                    onChange={() => handleSelectProperty(property._id ?? '')}
                     className="w-5 h-5 text-blue-600 bg-white border-2 border-gray-300 rounded-lg focus:ring-blue-500 focus:ring-2 transition-all duration-300 hover:scale-110"
                   />
                 </div>
@@ -584,7 +577,7 @@ export default function PropertiesPage() {
                   {/* Action Buttons */}
                   <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                     <button
-                      onClick={() => handleView(property.id)}
+                      onClick={() => handleView(property._id ?? '')}
                       className="group/btn inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl text-gray-600 bg-gray-50 hover:bg-gray-100 transition-all duration-300 transform hover:scale-105"
                     >
                       <Eye className="w-4 h-4 mr-2 group-hover/btn:animate-pulse" />
@@ -592,7 +585,7 @@ export default function PropertiesPage() {
                     </button>
                     
                     <button
-                      onClick={() => handleEdit(property.id)}
+                      onClick={() => handleEdit(property._id ?? '')}
                       className="group/btn inline-flex items-center px-6 py-2 text-sm font-bold rounded-xl text-white bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105"
                     >
                       <Edit3 className="w-4 h-4 mr-2 group-hover/btn:rotate-12 transition-transform duration-300" />
@@ -600,7 +593,7 @@ export default function PropertiesPage() {
                     </button>
                     
                     <button
-                      onClick={() => handleDelete(property.id)}
+                      onClick={() => handleDelete(property._id?? '')}
                       className="group/btn inline-flex items-center px-4 py-2 text-sm font-medium rounded-xl text-red-600 bg-red-50 hover:bg-red-100 transition-all duration-300 transform hover:scale-105"
                     >
                       <Trash2 className="w-4 h-4 mr-2 group-hover/btn:animate-bounce" />
@@ -610,7 +603,7 @@ export default function PropertiesPage() {
                 </div>
 
                 {/* Cute Sparkle Effect on Hover */}
-                {hoveredCard === property.id && (
+                {hoveredCard === property._id && (
                   <div className="absolute top-4 right-4 animate-ping">
                     <Sparkles className="w-4 h-4 text-blue-400" />
                   </div>

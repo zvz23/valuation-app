@@ -5,7 +5,7 @@ import { verifyToken } from './lib/auth';
 const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
 
 // CSRF token store (in production, use secure session storage)
-const csrfTokenStore = new Map<string, string>();
+
 
 interface RateLimitOptions {
   windowMs: number;
@@ -89,18 +89,6 @@ export async function middleware(request: NextRequest) {
     });
   }
 
-  // CSRF Protection for state-changing operations
-  if (request.method !== 'GET' && request.method !== 'HEAD' && request.method !== 'OPTIONS') {
-    const csrfToken = request.headers.get('x-csrf-token') || request.headers.get('csrf-token');
-    const sessionId = request.cookies.get('val-ai-auth')?.value;
-
-    if (sessionId) {
-      const expectedToken = csrfTokenStore.get(sessionId);
-      if (!csrfToken || !expectedToken || csrfToken !== expectedToken) {
-        return new NextResponse('CSRF Token Mismatch', { status: 403 });
-      }
-    }
-  }
 
   // Authentication for protected routes
   const protectedPaths = ['/properties', '/property', '/dashboard', '/admin'];
@@ -129,9 +117,9 @@ export async function middleware(request: NextRequest) {
       requestHeaders.set('x-user-role', payload.role);
 
       // Generate CSRF token for this session
-      if (!csrfTokenStore.has(token)) {
+      /*if (!csrfTokenStore.has(token)) {
         csrfTokenStore.set(token, generateCSRFToken());
-      }
+      }*/
 
       const response = NextResponse.next({
         request: {
@@ -140,7 +128,7 @@ export async function middleware(request: NextRequest) {
       });
 
       // Set CSRF token in response header
-      response.headers.set('x-csrf-token', csrfTokenStore.get(token) || '');
+      //response.headers.set('x-csrf-token', csrfTokenStore.get(token) || '');
       
       return response;
     } catch (error) {
