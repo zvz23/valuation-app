@@ -751,6 +751,7 @@ export default function PropertyValuationForm() {
   };
 
   const saveSection = async (sectionId: string) => {
+    
     const isValid = await trigger(sectionId as keyof PropertyValuationData);
     if (isValid) {
       const newEditingSections = new Set(editingSections);

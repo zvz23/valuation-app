@@ -30,7 +30,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   for (const [section, schema] of Object.entries(propertyValuationValidationSchemas)) {
     if (data[section]) {
       try {
-        const Model = mongoose.model('Temp', schema);
+        const modelName = `Temp_${section}`;
+        const Model = mongoose.models[modelName] || mongoose.model(modelName, schema);
         const doc = new Model(data[section]);
         const error = doc.validateSync();
         if (error) {
