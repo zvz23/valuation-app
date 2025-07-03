@@ -354,13 +354,27 @@ const RoomFeaturesPreview: React.FC<{ data: any; sectionKey?: string }> = ({ dat
     </div>
   </div>
 );
-
+import Image from 'next/image';
 const PhotosPreview: React.FC<{ data: any; sectionKey?: string }> = ({ data }) => (
   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in">
-    {['Exterior Photos', 'Interior Photos', 'Additional Photos'].map((type, index) => (
+    {['exteriorPhotos', 'interiorPhotos', 'additionalPhotos'].map((type, index) => (
       <div key={index} className="space-y-2 p-4 bg-white rounded-lg border hover:border-blue-300 transition-all duration-300">
-        <div className="text-sm font-medium text-gray-600">{type}</div>
-        <div className="text-gray-900">0 photos</div>
+        <div className="text-sm font-medium text-gray-600">
+          {type.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+        </div>
+        <div>
+          {Array.isArray(data?.[type]) && data[type].length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {data[type].map((url: string, i: number) => (
+                <a href={url} target="_blank" rel="noopener noreferrer" key={i}>
+                  <Image src={url} alt={type} className="w-24 h-24 object-cover rounded shadow" />
+                </a>
+              ))}
+            </div>
+          ) : (
+            <span className="text-gray-500">0 photos</span>
+          )}
+        </div>
       </div>
     ))}
   </div>
@@ -751,27 +765,45 @@ export default function PropertyValuationForm() {
   };
 
   const saveSection = async (sectionId: string) => {
-    
-    const isValid = await trigger(sectionId as keyof PropertyValuationData);
-    if (isValid) {
-      const newEditingSections = new Set(editingSections);
-      newEditingSections.delete(sectionId);
-      setEditingSections(newEditingSections);
+  const isValid = await trigger(sectionId as keyof PropertyValuationData);
+  if (!isValid) return;
 
-      const newCompleted = new Set(completedSections);
-      newCompleted.add(sectionId);
-      setCompletedSections(newCompleted);
+  const newEditingSections = new Set(editingSections);
+  newEditingSections.delete(sectionId);
+  setEditingSections(newEditingSections);
 
-      // Save only the section to DB
-      try {
-        await axios.put(`/api/property/${propertyId}`, {
-          [sectionId]: watchedData[sectionId as keyof PropertyValuationData]
-        });
-      } catch (e) {
-        alert('Failed to save section to database.');
+  const newCompleted = new Set(completedSections);
+  newCompleted.add(sectionId);
+  setCompletedSections(newCompleted);
+
+  try {
+    if (sectionId === 'photos') {
+
+      const formData = new FormData();
+      const photos = watchedData.photos;
+      for (const key of ['exteriorPhotos', 'interiorPhotos', 'additionalPhotos'] as const) {
+        const files = photos[key];
+        if (files && files.length) {
+          for (let i = 0; i < files.length; i++) {
+            formData.append(key, files[i]);
+          }
+        }
       }
+      // Add propertyId if needed
+      // formData.append('propertyId', propertyId);
+
+      await axios.put(`/api/property/${propertyId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+    } else {
+      await axios.put(`/api/property/${propertyId}`, {
+        [sectionId]: watchedData[sectionId as keyof PropertyValuationData]
+      });
     }
-  };
+  } catch (e) {
+    alert('Failed to save section to database.');
+  }
+};
 
    const cancelEdit = (sectionId: string) => {
     const newEditingSections = new Set(editingSections);
@@ -780,23 +812,67 @@ export default function PropertyValuationForm() {
   };
 
 
-   const onSave = async (data: PropertyValuationData) => {
-    try {
+  const onSave = async (data: PropertyValuationData) => {
+  try {
+    if (
+      data.photos &&
+      (data.photos.exteriorPhotos?.length ||
+        data.photos.interiorPhotos?.length ||
+        data.photos.additionalPhotos?.length)
+    ) {
+      const formData = new FormData();
+      (['exteriorPhotos', 'interiorPhotos', 'additionalPhotos'] as const).forEach((key) => {
+        const files = data.photos[key];
+        if (files && files.length) {
+          for (let i = 0; i < files.length; i++) {
+            formData.append(key, files[i]);
+          }
+        }
+      });
+      const { photos, ...rest } = data;
+      formData.append('data', JSON.stringify(rest));
+      await axios.put(`/api/property/${propertyId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+    } else {
       await axios.put(`/api/property/${propertyId}`, data);
-      alert('Data saved successfully!');
-    } catch (e) {
-      alert('Failed to save data to database.');
     }
-  };
+    alert('Data saved successfully!');
+  } catch (e) {
+    alert('Failed to save data to database.');
+  }
+};
 
-  // Submit all data to DB (could add status/flag for submission)
   const onSubmit = async (data: PropertyValuationData) => {
   if (!propertyId) {
     alert('No property ID found. Please create or select a property first.');
     return;
   }
   try {
-    await axios.put(`/api/property/${propertyId}`, data);
+    if (
+      data.photos &&
+      (data.photos.exteriorPhotos?.length ||
+        data.photos.interiorPhotos?.length ||
+        data.photos.additionalPhotos?.length)
+    ) {
+      
+      const formData = new FormData();
+      (['exteriorPhotos', 'interiorPhotos', 'additionalPhotos'] as const).forEach((key) => {
+        const files = data.photos[key];
+        if (files && files.length) {
+          for (let i = 0; i < files.length; i++) {
+            formData.append(key, files[i]);
+          }
+        }
+      });
+      const { photos, ...rest } = data;
+      formData.append('data', JSON.stringify(rest));
+      await axios.put(`/api/property/${propertyId}`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+    } else {
+      await axios.put(`/api/property/${propertyId}`, data);
+    }
     alert('Valuation report submitted successfully!');
   } catch (e) {
     alert('Failed to submit data to database.');
