@@ -1,6 +1,10 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+
+  images: {
+    domains: ['aap356-my.sharepoint.com'], 
+  },
   // Security headers
   async headers() {
     return [

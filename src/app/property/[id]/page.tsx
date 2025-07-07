@@ -354,7 +354,6 @@ const RoomFeaturesPreview: React.FC<{ data: any; sectionKey?: string }> = ({ dat
     </div>
   </div>
 );
-import Image from 'next/image';
 const PhotosPreview: React.FC<{ data: any; sectionKey?: string }> = ({ data }) => (
   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in">
     {['exteriorPhotos', 'interiorPhotos', 'additionalPhotos'].map((type, index) => (
@@ -367,7 +366,7 @@ const PhotosPreview: React.FC<{ data: any; sectionKey?: string }> = ({ data }) =
             <div className="flex flex-wrap gap-2">
               {data[type].map((url: string, i: number) => (
                 <a href={url} target="_blank" rel="noopener noreferrer" key={i}>
-                  <Image src={url} alt={type} className="w-24 h-24 object-cover rounded shadow" />
+                  <img src={url} alt={type} width={100} height={100} className="w-24 h-24 object-cover rounded shadow" />
                 </a>
               ))}
             </div>
@@ -883,9 +882,23 @@ export default function PropertyValuationForm() {
     alert('PDF Preview functionality coming soon...');
   };
 
-  const handleGenerateReport = () => {
-    alert('Generate PDF Report functionality coming soon...');
-  };
+  const handleGenerateReport = async () => {
+  try {
+    const res = await fetch(`/api/property/${propertyId}/report`);
+    const data = await res.json();
+
+    if (data?.reportUrl) {
+      window.open(data.reportUrl, '_blank'); // Opens OneDrive Excel in a new tab
+    } else {
+      alert('Report generation failed.');
+    }
+  } catch (err) {
+    console.error('Error generating report:', err);
+    alert('Something went wrong generating the report.');
+  }
+};
+
+
 
   const handleStageChange = (newStage: string) => {
     setCurrentStage(newStage);
