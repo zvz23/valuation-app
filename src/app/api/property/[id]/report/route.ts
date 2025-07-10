@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { uploadToOneDrive } from '@/lib/onedrive';
-
+import { Buffer } from 'buffer';
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   await connectDB();
   const { id } = await  context.params;
@@ -74,9 +74,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     };
 
     const oneDriveUrl = await uploadToOneDrive(file, id, 'Valuation-Report');
+    const base64 = buffer.toString('base64');
 
-
-    return NextResponse.json({ success: true, reportUrl: oneDriveUrl });
+    return NextResponse.json({ success: true, reportUrl: oneDriveUrl, download: base64, filename: `Valuation-Report-${id}.xlsx`, });
   } catch (err: any) {
     console.error('Excel Report Error:', err);
     return NextResponse.json({ error: 'Failed to generate report', message: err.message }, { status: 500 });

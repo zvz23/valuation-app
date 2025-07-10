@@ -888,7 +888,22 @@ export default function PropertyValuationForm() {
     const data = await res.json();
 
     if (data?.reportUrl) {
-      window.open(data.reportUrl, '_blank'); // Opens OneDrive Excel in a new tab
+      window.open(data.reportUrl, '_blank');
+    }
+
+    if (data?.download && data?.filename) {
+      const blob = new Blob([Uint8Array.from(atob(data.download), c => c.charCodeAt(0))], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = data.filename;
+      document.body.appendChild(a);
+      a.click();
+      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
     } else {
       alert('Report generation failed.');
     }
