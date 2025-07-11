@@ -1,59 +1,96 @@
-import React from 'react';
-import { FormField, FileUpload } from '../ui/FormField';
+import React, { useState } from 'react';
+import { FormField } from '../ui/FormField';
 import { SectionProps } from '@/types/valuation';
 
-export const PhotosSection: React.FC<SectionProps> = ({
-  register,
-  errors
-}) => {
+export const PhotosSection: React.FC<SectionProps> = ({ register, errors }) => {
+  const [counts, setCounts] = useState({
+    exterior: 0,
+    interior: 0,
+    additional: 0,
+  });
+
+  const handleFileChange = (type: 'exterior' | 'interior' | 'additional') =>
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = event.target.files;
+      setCounts(prev => ({
+        ...prev,
+        [type]: files?.length || 0
+      }));
+    };
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-6">
+        {/* Exterior */}
         <FormField
           label="Exterior Photos"
           error={errors.photos?.exteriorPhotos?.message}
         >
-          <FileUpload
-            {...register('photos.exteriorPhotos')}
-            multiple
+          <input
+            type="file"
             accept="image/*"
-            error={errors.photos?.exteriorPhotos?.message}
+            multiple
+            {...register('photos.exteriorPhotos')}
+            onChange={handleFileChange('exterior')}
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:border file:border-gray-300 file:rounded-md file:text-sm file:bg-white file:text-gray-700 hover:file:bg-gray-100"
           />
           <p className="text-sm text-gray-500 mt-1">
-            Upload multiple exterior photos of the property (front, back, sides, garden, etc.)
+            Upload exterior photos (front, back, garden, etc.)
           </p>
+          {counts.exterior > 0 && (
+            <p className="text-xs text-green-600 mt-1">
+              {counts.exterior} photo{counts.exterior > 1 ? 's' : ''} selected
+            </p>
+          )}
         </FormField>
 
+        {/* Interior */}
         <FormField
           label="Interior Photos"
           error={errors.photos?.interiorPhotos?.message}
         >
-          <FileUpload
-            {...register('photos.interiorPhotos')}
-            multiple
+          <input
+            type="file"
             accept="image/*"
-            error={errors.photos?.interiorPhotos?.message}
+            multiple
+            {...register('photos.interiorPhotos')}
+            onChange={handleFileChange('interior')}
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:border file:border-gray-300 file:rounded-md file:text-sm file:bg-white file:text-gray-700 hover:file:bg-gray-100"
           />
           <p className="text-sm text-gray-500 mt-1">
-            Upload photos of interior rooms (kitchen, bedrooms, bathrooms, living areas, etc.)
+            Upload interior room photos (kitchen, bathrooms, etc.)
           </p>
+          {counts.interior > 0 && (
+            <p className="text-xs text-green-600 mt-1">
+              {counts.interior} photo{counts.interior > 1 ? 's' : ''} selected
+            </p>
+          )}
         </FormField>
 
+        {/* Additional */}
         <FormField
           label="Additional Photos"
           error={errors.photos?.additionalPhotos?.message}
         >
-          <FileUpload
-            {...register('photos.additionalPhotos')}
-            multiple
+          <input
+            type="file"
             accept="image/*"
-            error={errors.photos?.additionalPhotos?.message}
+            multiple
+            {...register('photos.additionalPhotos')}
+            onChange={handleFileChange('additional')}
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:border file:border-gray-300 file:rounded-md file:text-sm file:bg-white file:text-gray-700 hover:file:bg-gray-100"
           />
           <p className="text-sm text-gray-500 mt-1">
-            Upload any additional photos (special features, defects, improvements, etc.)
+            Upload other relevant images (defects, features, etc.)
           </p>
+          {counts.additional > 0 && (
+            <p className="text-xs text-green-600 mt-1">
+              {counts.additional} photo{counts.additional > 1 ? 's' : ''} selected
+            </p>
+          )}
         </FormField>
 
+        {/* Guidelines */}
         <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
           <div className="flex">
             <div className="flex-shrink-0">
@@ -62,23 +99,17 @@ export const PhotosSection: React.FC<SectionProps> = ({
               </svg>
             </div>
             <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">
-                Photo Guidelines
-              </h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <ul className="list-disc pl-5 space-y-1">
-                  <li>Accepted formats: JPEG, PNG, WebP</li>
-                  <li>Maximum file size: 10MB per image</li>
-                  <li>Recommended resolution: At least 1024x768 pixels</li>
-                  <li>Take photos in good lighting conditions</li>
-                  <li>Include wide-angle shots of each room</li>
-                  <li>Capture any defects or special features clearly</li>
-                </ul>
-              </div>
+              <h3 className="text-sm font-medium text-blue-800">Photo Guidelines</h3>
+              <ul className="list-disc pl-5 mt-2 text-sm text-blue-700 space-y-1">
+                <li>Accepted formats: JPEG, PNG, WebP</li>
+                <li>Max file size: 10MB per image</li>
+                <li>Recommended resolution: 1024x768+</li>
+                <li>Good lighting, wide-angle shots preferred</li>
+              </ul>
             </div>
           </div>
         </div>
       </div>
     </div>
   );
-}; 
+};

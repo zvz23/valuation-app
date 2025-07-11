@@ -45,7 +45,7 @@ const nextConfig: NextConfig = {
               style-src 'self' 'unsafe-inline' fonts.googleapis.com;
               img-src 'self' data: blob: https:;
               font-src 'self' fonts.gstatic.com;
-              connect-src 'self' ${process.env.NODE_ENV === 'development' ? 'ws: wss:' : ''};
+              connect-src 'self' ${process.env.NODE_ENV === 'development' ? 'ws: wss:' : ''} https://*.sharepoint.com https://*.microsoftonline.com;
               frame-ancestors 'none';
               base-uri 'self';
               form-action 'self';
@@ -56,7 +56,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  
+ 
   // External packages for server components
   serverExternalPackages: ['bcryptjs'],
   

@@ -6,77 +6,158 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { uploadToOneDrive } from '@/lib/onedrive';
-import { Buffer } from 'buffer';
+
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   await connectDB();
-  const { id } = await  context.params;
+  const { id } = await context.params;
 
   try {
-    const property = await PropertyValuation.findById(id);
+    const property: any = await PropertyValuation.findById(id).lean();
     if (!property) return NextResponse.json({ error: 'Property not found' }, { status: 404 });
 
     const workbook = new ExcelJS.Workbook();
     const templatePath = path.resolve(process.cwd(), 'public/templates/AAP-Report.xlsx');
     await workbook.xlsx.readFile(templatePath);
 
-    const filloutSheet = workbook.getWorksheet('Fillout');
-    const photoSheet = workbook.getWorksheet('Photos');
+    // 🧹 Keep only allowed sheets
+    const allowedSheets = ['Fillout', 'Photos', 'Report Cover', 'Valuation Summary'];
+    workbook.worksheets.forEach(sheet => {
+      if (!allowedSheets.includes(sheet.name)) {
+        workbook.removeWorksheet(sheet.id);
+      }
+    });
 
-    if (!filloutSheet || !photoSheet) {
-      return NextResponse.json({ error: 'Excel template missing required sheets' }, { status: 500 });
-    }
+    // 🧹 Recreate Fillout Sheet
+    const existingFillout = workbook.getWorksheet('Fillout');
+    if (existingFillout) workbook.removeWorksheet(existingFillout.id);
+    const filloutSheet = workbook.addWorksheet('Fillout');
+
+    let row = 1;
+
+    // 📌 Horizontal Overview Section
     const overview = property.overview || {};
-    const fillMap: Record<string, any> = {
-      B3: overview.jobNumber,
-      B4: overview.closedBy,
-      B5: overview.propertyValuer,
-      B6: overview.instructedBy,
-      B7: overview.reportType,
-      B8: overview.valuationType,
-      B9: overview.surveyType,
-      B10: overview.dateOfInspection,
-      B11: overview.dateOfValuation,
-      B12: overview.addressStreet,
-      B13: overview.addressSuburb,
-      B14: overview.addressState,
-      B15: overview.addressPostcode,
-      B16: overview.purposeOfReport,
-      B17: overview.reportUploaded,
-      B18: overview.reportSent,
-    };
+    filloutSheet.getCell(`A${row}`).value = 'Overview';
+    filloutSheet.getRow(row).font = { bold: true };
+    row++;
 
-    for (const [cell, value] of Object.entries(fillMap)) {
-      filloutSheet.getCell(cell).value = value || '';
+    let col = 1;
+    for (const key in overview) {
+      if (['_id', '__v', 'createdAt', 'updatedAt'].includes(key)) continue;
+      filloutSheet.getCell(row, col).value = key;
+      col++;
     }
 
-    // Add photo URLs to Photos sheet
-    const photos = property.photos || {};
-    let row = 4;
-    for (let i = 1; i <= 6; i++) {
-      const key = `Photo${i}`;
-      const urls = photos[key];
-      if (Array.isArray(urls) && urls.length > 0) {
-        photoSheet.getCell(`B${row}`).value = key;
-        photoSheet.getCell(`C${row}`).value = urls[0];
+    row++;
+    col = 1;
+    for (const key in overview) {
+      if (['_id', '__v', 'createdAt', 'updatedAt'].includes(key)) continue;
+      const value = overview[key];
+      filloutSheet.getCell(row, col).value =
+        value === null || value === undefined
+          ? ''
+          : typeof value === 'object'
+          ? JSON.stringify(value)
+          : value;
+      col++;
+    }
+    row += 2; // spacing after overview
+
+    // 📌 Helper for vertical sections
+    const writeSection = (title: string, data: Record<string, any>) => {
+      filloutSheet.getCell(`A${row}`).value = title;
+      filloutSheet.getRow(row).font = { bold: true };
+      row++;
+      for (const key in data) {
+        if (['_id', '__v', 'createdAt', 'updatedAt'].includes(key)) continue;
+        filloutSheet.getCell(`A${row}`).value = key;
+        const value = data[key];
+        filloutSheet.getCell(`B${row}`).value =
+          value === null || value === undefined
+            ? ''
+            : typeof value === 'object'
+            ? JSON.stringify(value)
+            : value;
         row++;
       }
+      row++;
+    };
+
+    // 📌 Vertical sections
+    writeSection('Valuation Details', property.valuationDetails || {});
+    writeSection('Property Details', property.propertyDetails || {});
+    writeSection('Location and Neighborhood', property.locationAndNeighborhood || {});
+    writeSection('Room Features and Fixtures', property.roomFeaturesFixtures || {});
+    writeSection('Property Descriptors', property.propertyDescriptors || {});
+    writeSection('Ancillary Improvements', property.ancillaryImprovements || {});
+    writeSection('Statutory Details', property.statutoryDetails || {});
+    writeSection('Site Details', property.siteDetails || {});
+    writeSection('Planning Details', property.planningDetails || {});
+    writeSection('General Comments', property.generalComments || {});
+
+    // 🧹 Recreate Photos Sheet
+    const existingPhotosSheet = workbook.getWorksheet('Photos');
+    if (existingPhotosSheet) workbook.removeWorksheet(existingPhotosSheet.id);
+
+    const photoSheet = workbook.addWorksheet('Photos');
+    let photoRow = 1;
+
+    const photos = property.photos || {};
+    const exteriorPhotos = photos.exteriorPhotos || [];
+    const interiorPhotos = photos.interiorPhotos || [];
+    const additionalPhotos = photos.additionalPhotos || [];
+
+    // ➤ Report Cover Photo (first exterior photo)
+    if (exteriorPhotos.length > 0) {
+      photoSheet.getCell(`A${photoRow}`).value = 'Report Cover Photo';
+      photoSheet.getCell(`B${photoRow}`).value = {
+        text: exteriorPhotos[0],
+        hyperlink: exteriorPhotos[0],
+      };
+      photoRow += 2;
     }
 
-    // Save Excel to temp file
+    // ➤ Helper for Photo Sections
+    const writePhotoSection = (title: string, photoArray: string[]) => {
+      if (!photoArray.length) return;
+      photoSheet.getCell(`A${photoRow}`).value = `Photos (${title}):`;
+      photoSheet.getRow(photoRow).font = { bold: true };
+      photoRow++;
+
+      photoArray.forEach((url, index) => {
+        photoSheet.getCell(`A${photoRow}`).value = `Photo ${index + 1}`;
+        photoSheet.getCell(`B${photoRow}`).value = {
+          text: url,
+          hyperlink: url,
+        };
+        photoRow++;
+      });
+
+      photoRow++; // spacing
+    };
+
+    writePhotoSection('Exterior Photos', exteriorPhotos);
+    writePhotoSection('Interior Photos', interiorPhotos);
+    writePhotoSection('Additional Photos', additionalPhotos);
+
+    // ✅ Save and return file
     const tempFilePath = path.join(os.tmpdir(), `${id}-valuation-report.xlsx`);
     await workbook.xlsx.writeFile(tempFilePath);
 
     const buffer = fs.readFileSync(tempFilePath);
-
     const file = {
-        buffer,
-        originalname: `Valuation-Report-${id}.xlsx`,
+      buffer,
+      originalname: `Valuation-Report-${id}.xlsx`,
     };
 
     const oneDriveUrl = await uploadToOneDrive(file, id, 'Valuation-Report');
-    const base64 = buffer.toString('base64');
+    const downloadBase64 = buffer.toString('base64');
 
-    return NextResponse.json({ success: true, reportUrl: oneDriveUrl, download: base64, filename: `Valuation-Report-${id}.xlsx`, });
+    return NextResponse.json({
+      success: true,
+      reportUrl: oneDriveUrl,
+      download: downloadBase64,
+      filename: `Valuation-Report-${id}.xlsx`,
+    });
   } catch (err: any) {
     console.error('Excel Report Error:', err);
     return NextResponse.json({ error: 'Failed to generate report', message: err.message }, { status: 500 });

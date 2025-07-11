@@ -102,7 +102,19 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         uploadedUrls[key] = urls;
       }
 
-      data.photos = uploadedUrls;
+      const existing:any = await PropertyValuation.findById(id).lean();
+      if (!existing) {
+        return NextResponse.json({ error: 'Property not found' }, { status: 404 });
+      }
+
+      const mergedPhotos = { ...(existing.photos || {}) };
+
+      for (const [key, newUrls] of Object.entries(uploadedUrls)) {
+        mergedPhotos[key] = [...(mergedPhotos[key] || []), ...newUrls];
+      }
+
+      data.photos = mergedPhotos;
+
       console.log('Uploaded to OneDrive:', uploadedUrls);
     } catch (err: any) {
       console.error('Failed to upload photos to OneDrive:', err);

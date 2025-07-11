@@ -892,9 +892,10 @@ export default function PropertyValuationForm() {
     }
 
     if (data?.download && data?.filename) {
-      const blob = new Blob([Uint8Array.from(atob(data.download), c => c.charCodeAt(0))], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      });
+      const blob = new Blob(
+        [Uint8Array.from(atob(data.download), c => c.charCodeAt(0))],
+        { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }
+      );
 
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -912,6 +913,8 @@ export default function PropertyValuationForm() {
     alert('Something went wrong generating the report.');
   }
 };
+
+
 
 
 
