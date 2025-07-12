@@ -507,3 +507,25 @@ export const formatPlaceName = (place: any): string => {
   
   return name;
 }; 
+export const fetchSuburbDescriptionFromWikipedia = async (
+  suburbName: string,
+  stateName?: string
+): Promise<string | null> => {
+  const params = new URLSearchParams({ suburb: suburbName });
+  if (stateName) {
+    params.append("state", stateName);
+  }
+
+  const endpoint = `/api/wiki-summary?${params.toString()}`;
+
+  try {
+    const response = await fetch(endpoint);
+    if (!response.ok) throw new Error('Failed to fetch from backend proxy');
+
+    const data = await response.json();
+    return data.extract || null;
+  } catch (error) {
+    console.error(`Wikipedia fetch failed for ${suburbName}:`, error);
+    return null;
+  }
+};

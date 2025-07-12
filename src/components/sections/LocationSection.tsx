@@ -14,7 +14,7 @@ import {
   formatPlaceName,
   isValidCoordinate
 } from '@/utils/locationUtils';
-
+import { fetchSuburbDescriptionFromWikipedia } from '@/utils/locationUtils';
 const transportTypeOptions = [
   { value: 'bus_stop', label: 'Bus Stop' },
   { value: 'train_station', label: 'Train Station' },
@@ -570,9 +570,16 @@ export const LocationSection: React.FC<SectionProps> = ({
       // Enhanced suburb information
       if (locality) {
         const suburbName = locality.long_name;
-        const description = `Located in the established residential area of ${suburbName}`;
-        const description2 = 'Well-connected location with access to local amenities and transport infrastructure';
-        
+        const stateComponent = addressComponents.find((component: any) =>
+        component.types.includes('administrative_area_level_1')
+      );
+      const stateName = stateComponent?.long_name || '';
+
+        const wikiDescription = await fetchSuburbDescriptionFromWikipedia(suburbName,stateName);
+      const description = wikiDescription || `Located in the established residential area of ${suburbName}`;
+      const description2 = 'Well-connected location with access to local amenities and transport infrastructure';
+
+      
         newFetchedData.suburbInfo = {
           description,
           description2
