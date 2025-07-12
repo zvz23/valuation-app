@@ -878,9 +878,22 @@ export default function PropertyValuationForm() {
   }
 };
 
-  const handlePreview = () => {
-    alert('PDF Preview functionality coming soon...');
-  };
+  const handlePreview = async () => {
+  try {
+    const res = await fetch(`/api/property/${propertyId}/report`);
+    const data = await res.json();
+
+    if (data?.pdfUrl) {
+      window.open(data.pdfUrl, '_blank'); // Preview PDF in new tab
+    } else {
+      alert('PDF preview not available.');
+    }
+  } catch (err) {
+    console.error('Error previewing report:', err);
+    alert('Something went wrong loading the PDF preview.');
+  }
+};
+
 
   const handleGenerateReport = async () => {
   try {
@@ -999,7 +1012,7 @@ export default function PropertyValuationForm() {
                 </div>
               </div>
             </div>
-            
+           
             {/* Action Buttons */}
             <div className="flex space-x-3 animate-fade-in">
               <button

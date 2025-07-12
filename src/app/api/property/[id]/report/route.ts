@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { uploadToOneDrive } from '@/lib/onedrive';
-
+import { generatePDFReport } from '@/lib/pdf';
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   await connectDB();
   const { id } = await context.params;
@@ -151,10 +151,19 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 
     const oneDriveUrl = await uploadToOneDrive(file, id, 'Valuation-Report');
     const downloadBase64 = buffer.toString('base64');
+    const pdfBuffer = await generatePDFReport(property); 
+
+      const pdfFile = {
+        buffer: pdfBuffer,
+        originalname: `Valuation-Report-${id}.pdf`,
+      };
+
+      const pdfUrl = await uploadToOneDrive(pdfFile, id, 'Valuation-PDF');
 
     return NextResponse.json({
       success: true,
       reportUrl: oneDriveUrl,
+      pdfUrl: pdfUrl,
       download: downloadBase64,
       filename: `Valuation-Report-${id}.xlsx`,
     });
