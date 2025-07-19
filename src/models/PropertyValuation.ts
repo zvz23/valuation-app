@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Document } from 'mongoose';
 
 const OverviewSchema = new Schema({
   jobNumber: String,
@@ -95,47 +95,43 @@ const PropertyDetailsSchema = new Schema({
   wallConstruction: String,
 }, { _id: false });
 
+import { Schema } from 'mongoose';
+
+const DistanceObjectSchema = new Schema({
+  name: String,
+  type: String,
+  distance: String,
+  unit: String
+}, { _id: false });
+
+const SchoolDistanceSchema = new Schema({
+  name: String,
+  distance: String,
+  unit: String
+}, { _id: false });
+
+const CBDObjectSchema = new Schema({
+  name: String,
+  distance: String,
+  unit: String,
+  travelTime: String
+}, { _id: false });
+
+const ConnectedStreetSchema = new Schema({
+  name: String,
+  position: String
+}, { _id: false });
+
 const LocationAndNeighborhoodSchema = new Schema({
   suburbDescription: String,
   suburbDescription2: String,
-  publicTransport: {
-    name: String,
-    type: String,
-    distance: String,
-    unit: String,
-  },
-  busStop: {
-    name: String,
-    type: String,
-    distance: String,
-    unit: String,
-  },
-  shop: {
-    name: String,
-    type: String,
-    distance: String,
-    unit: String,
-  },
-  primarySchool: {
-    name: String,
-    distance: String,
-    unit: String,
-  },
-  highSchool: {
-    name: String,
-    distance: String,
-    unit: String,
-  },
-  cbd: {
-    name: String,
-    distance: String,
-    unit: String,
-    travelTime: String,
-  },
-  connectedStreet: {
-    name: String,
-    position: String,
-  },
+  publicTransport: DistanceObjectSchema,
+  busStop: DistanceObjectSchema,
+  shop: DistanceObjectSchema,
+  primarySchool: SchoolDistanceSchema,
+  highSchool: SchoolDistanceSchema,
+  cbd: CBDObjectSchema,
+  connectedStreet: ConnectedStreetSchema,
   includesGas: Boolean,
   suburb: String,
   city: String,
@@ -144,8 +140,10 @@ const LocationAndNeighborhoodSchema = new Schema({
   proximityToAmenities: [String],
   transportLinks: String,
   neighborhoodCharacter: String,
-  schoolDistrict: String,
+  schoolDistrict: String
 }, { _id: false });
+
+
 
 const RoomFeaturesFixturesSchema = new Schema({
   primaryCategory: String,
@@ -379,6 +377,10 @@ export interface IPropertyValuation extends Document {
   generalComments: any;
   marketEvidence: any;
   annexures: any;
+}
+
+if (mongoose.models['PropertyValuation']) {
+  delete mongoose.models['PropertyValuation'];
 }
 
 export default mongoose.models.PropertyValuation || mongoose.model<IPropertyValuation>('PropertyValuation', PropertyValuationSchema);
