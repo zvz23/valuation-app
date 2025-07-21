@@ -18,14 +18,9 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     const workbook = new ExcelJS.Workbook();
     const templatePath = path.resolve(process.cwd(), 'public/templates/AAP-Report.xlsx');
     await workbook.xlsx.readFile(templatePath);
+    workbook.calcProperties.fullCalcOnLoad = true;
 
-    // 🧹 Keep only allowed sheets
-    const allowedSheets = ['Fillout', 'Photos', 'Report Cover', 'Valuation Summary'];
-    workbook.worksheets.forEach(sheet => {
-      if (!allowedSheets.includes(sheet.name)) {
-        workbook.removeWorksheet(sheet.id);
-      }
-    });
+
 
     const filloutSheet = workbook.getWorksheet('Fillout');
     if (!filloutSheet) {
@@ -36,7 +31,11 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     const overview = property.overview || {};
     const valuationDetails = property.valuationDetails || {};
     const propertyDetails = property.propertyDetails || {};
+    const propertyDescriptors = property.propertyDescriptors || {};
     const locationAndNeighborhood = property.locationAndNeighborhood || {};
+    const siteDetails = property.siteDetails || {};
+    const ancillaryImprovements = property.ancillaryImprovements || {};
+    const generalComments = property.generalComments || {};
     filloutSheet.getCell('B2').value = overview.jobNumber || '';
     filloutSheet.getCell('C2').value = overview.closedByz || '';
     filloutSheet.getCell('D2').value = overview.propertyValuer || '';
@@ -70,57 +69,122 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     filloutSheet.getCell('B39').value = propertyDetails.externalArea || '';
     filloutSheet.getCell('B44').value = locationAndNeighborhood.suburbDescription || '';
     filloutSheet.getCell('B45').value = locationAndNeighborhood.addressStreet || '';
-    filloutSheet.getCell('B46').value = locationAndNeighborhood.connectedStreet || '';
+    filloutSheet.getCell('B46').value = locationAndNeighborhood.connectedStreet?.name || '';
     filloutSheet.getCell('B47').value = locationAndNeighborhood.publicTransport?.type || '';
     filloutSheet.getCell('B48').value = locationAndNeighborhood.publicTransport?.name || '';
     filloutSheet.getCell('B49').value = locationAndNeighborhood.publicTransport?.distance || '';
     filloutSheet.getCell('B50').value = locationAndNeighborhood.shop?.type || '';
     filloutSheet.getCell('B51').value = locationAndNeighborhood.shop?.distance || '';
-    
-    // 🧹 Recreate Photos Sheet
-    const existingPhotosSheet = workbook.getWorksheet('Photos');
-    if (existingPhotosSheet) workbook.removeWorksheet(existingPhotosSheet.id);
+    filloutSheet.getCell('B52').value = locationAndNeighborhood.primarySchool?.name || '';
+    filloutSheet.getCell('B53').value = locationAndNeighborhood.primarySchool?.distance || '';
+    filloutSheet.getCell('B54').value = locationAndNeighborhood.highSchool?.name || '';
+    filloutSheet.getCell('B55').value = locationAndNeighborhood.highSchool?.distance || '';
+    filloutSheet.getCell('B56').value = locationAndNeighborhood.cbd?.name || '';
+    filloutSheet.getCell('B57').value = locationAndNeighborhood.cbd?.distance || '';
+    filloutSheet.getCell('B58').value = locationAndNeighborhood.includesGas || '';
+    filloutSheet.getCell('B63').value = siteDetails.mapSource || '';
+    filloutSheet.getCell('B66').value = propertyDescriptors.mainBuildingType || '';
+    filloutSheet.getCell('B67').value = propertyDescriptors.externalWalls || '';
+    filloutSheet.getCell('B68').value = propertyDescriptors.internalWalls || '';
+    filloutSheet.getCell('B69').value = propertyDescriptors.roofing || '';
+    filloutSheet.getCell('B70').value = propertyDescriptors.numberOfBedrooms || '';
+    filloutSheet.getCell('B71').value = propertyDescriptors.numberOfBathrooms || '';
+    filloutSheet.getCell('B72').value = propertyDescriptors.parkingType || '';
+    filloutSheet.getCell('B75').value = propertyDescriptors.internalCondition || '';
+    filloutSheet.getCell('B76').value = propertyDescriptors.externalCondition || '';
+    filloutSheet.getCell('B77').value = propertyDescriptors.repairRequirements || '';
+    filloutSheet.getCell('B78').value = propertyDescriptors.defects || '';
+    filloutSheet.getCell('B83').value = ancillaryImprovements.driveway || '';
+    filloutSheet.getCell('B84').value = ancillaryImprovements.fencing || '';
+    filloutSheet.getCell('B85').value = ancillaryImprovements.otherImprovements || '';
+    filloutSheet.getCell('B143').value = generalComments.marketOverview || '';
+    filloutSheet.getCell('B182').value = valuationDetails.landValue || '';
+    filloutSheet.getCell('B183').value = valuationDetails.improvements || '';
+    filloutSheet.getCell('B184').value = valuationDetails.marketValue || '';
 
-    const photoSheet = workbook.addWorksheet('Photos');
-    let photoRow = 1;
+    // 🧹 Recreate Photos Sheet
+    const photoSheet = workbook.getWorksheet('Photos');
+    if (!photoSheet) {
+      throw new Error('Photos sheet not found in template');
+    }
 
     const photos = property.photos || {};
     const exteriorPhotos = photos.exteriorPhotos || [];
     const interiorPhotos = photos.interiorPhotos || [];
     const additionalPhotos = photos.additionalPhotos || [];
 
-    // ➤ Report Cover Photo (first exterior photo)
-    if (exteriorPhotos.length > 0) {
-      photoSheet.getCell(`A${photoRow}`).value = 'Report Cover Photo';
-      photoSheet.getCell(`B${photoRow}`).value = {
-        text: exteriorPhotos[0],
-        hyperlink: exteriorPhotos[0],
+    // ✨ Total row capacity starting from AB4 down to AB34 = 31 rows
+    const maxRows = 31;
+    const startingRow = 4;
+    const currentRow = startingRow;
+
+    // 👇 Fill as many photos as possible until AB34
+    const allPhotos: { type: string; url: string }[] = [
+  ...exteriorPhotos.map((url: string) => ({ type: 'Exterior', url })),
+  ...interiorPhotos.map((url: string) => ({ type: 'Interior', url })),
+  ...additionalPhotos.map((url: string) => ({ type: 'Additional', url })),
+    ];
+
+
+    for (let i = 0; i < Math.min(allPhotos.length, maxRows); i++) {
+      const row = startingRow + i;
+      const cell = `AB${row}`;
+
+      photoSheet.getCell(cell).value = {
+        text: allPhotos[i].url,
+        hyperlink: allPhotos[i].url,
       };
-      photoRow += 2;
+    }
+  
+    // 🧼 Optional: Clear remaining AB cells if total < 31 to avoid old data
+    for (let i = allPhotos.length; i < maxRows; i++) {
+      const row = startingRow + i;
+      photoSheet.getCell(`AB${row}`).value = '';
+    }
+    // valuation-summary page
+
+    
+
+    const valuationSummarySheet = workbook.getWorksheet('Valuation Summary');
+
+    if (!valuationSummarySheet) {
+      throw new Error('Valuation sheet not found in template');
     }
 
-    // ➤ Helper for Photo Sections
-    const writePhotoSection = (title: string, photoArray: string[]) => {
-      if (!photoArray.length) return;
-      photoSheet.getCell(`A${photoRow}`).value = `Photos (${title}):`;
-      photoSheet.getRow(photoRow).font = { bold: true };
-      photoRow++;
+    const photos1 = property.photos || {};
+    const exteriorPhotos1 = photos1.exteriorPhotos || [];
+    const interiorPhotos1 = photos1.interiorPhotos || [];
+    const additionalPhotos1 = photos1.additionalPhotos || [];
 
-      photoArray.forEach((url, index) => {
-        photoSheet.getCell(`A${photoRow}`).value = `Photo ${index + 1}`;
-        photoSheet.getCell(`B${photoRow}`).value = {
-          text: url,
-          hyperlink: url,
-        };
-        photoRow++;
-      });
+    // ✨ Total row capacity starting from AB4 down to AB34 = 31 rows
+    const maxRows1 = 31;
+    const startingRow1= 8;
+    const currentRow1 = startingRow1;
 
-      photoRow++; // spacing
-    };
+    // 👇 Fill as many photos as possible until AB34
+    const allPhotos1: { type: string; url: string }[] = [
+  ...exteriorPhotos1.map((url: string) => ({ type: 'Exterior', url })),
+  ...interiorPhotos1.map((url: string) => ({ type: 'Interior', url })),
+  ...additionalPhotos1.map((url: string) => ({ type: 'Additional', url })),
+    ];
 
-    writePhotoSection('Exterior Photos', exteriorPhotos);
-    writePhotoSection('Interior Photos', interiorPhotos);
-    writePhotoSection('Additional Photos', additionalPhotos);
+
+    for (let i = 0; i < Math.min(allPhotos1.length, maxRows); i++) {
+      const row = startingRow1 + i;
+      const cell = `DR${row}`;
+
+      valuationSummarySheet.getCell(cell).value = {
+        text: 'View Photo ' + (i + 1),
+        hyperlink: allPhotos1[i].url,
+      };
+    }
+  
+    // 🧼 Optional: Clear remaining AB cells if total < 31 to avoid old data
+    for (let i = allPhotos1.length; i < maxRows1; i++) {
+      const row = startingRow1 + i;
+      valuationSummarySheet.getCell(`DO${row}`).value = '';
+    }
+
 
     // ✅ Save and return file
     const tempFilePath = path.join(os.tmpdir(), `${id}-valuation-report.xlsx`);
