@@ -112,11 +112,14 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     const exteriorPhotos = photos.exteriorPhotos || [];
     const interiorPhotos = photos.interiorPhotos || [];
     const additionalPhotos = photos.additionalPhotos || [];
+    const reportCoverPhoto = photos.reportCoverPhoto || [];
 
     // ✨ Total row capacity starting from AB4 down to AB34 = 31 rows
     const maxRows = 31;
     const startingRow = 4;
     const currentRow = startingRow;
+
+    photoSheet.getCell('C4').value  = {text: "View Report Cover Photo", hyperlink: reportCoverPhoto[0] || ''};
 
     // 👇 Fill as many photos as possible until AB34
     const allPhotos: { type: string; url: string }[] = [
@@ -152,6 +155,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     }
 
     const photos1 = property.photos || {};
+    
     const exteriorPhotos1 = photos1.exteriorPhotos || [];
     const interiorPhotos1 = photos1.interiorPhotos || [];
     const additionalPhotos1 = photos1.additionalPhotos || [];
@@ -184,6 +188,16 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       const row = startingRow1 + i;
       valuationSummarySheet.getCell(`DO${row}`).value = '';
     }
+    // report overview page
+
+    const reportOverviewSheet = workbook.getWorksheet('Report Cover');
+    if (!reportOverviewSheet) {
+      throw new Error('Report Cover sheet not found in template');
+    }
+
+    const reportCoverPhoto1 = photos1.reportCoverPhoto || [];
+
+    reportOverviewSheet.getCell('Q13').value = {text: "View Report Cover Photo", hyperlink: reportCoverPhoto1[0] || ''};
 
 
     // ✅ Save and return file

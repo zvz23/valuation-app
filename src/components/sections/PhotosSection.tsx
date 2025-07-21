@@ -4,12 +4,13 @@ import { SectionProps } from '@/types/valuation';
 
 export const PhotosSection: React.FC<SectionProps> = ({ register, errors }) => {
   const [counts, setCounts] = useState({
+    reportCover: 0,
     exterior: 0,
     interior: 0,
     additional: 0,
   });
 
-  const handleFileChange = (type: 'exterior' | 'interior' | 'additional') =>
+  const handleFileChange = (type: 'exterior' | 'interior' | 'additional' | 'reportCover') =>
     (event: React.ChangeEvent<HTMLInputElement>) => {
       const files = event.target.files;
       setCounts(prev => ({
@@ -21,6 +22,27 @@ export const PhotosSection: React.FC<SectionProps> = ({ register, errors }) => {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 gap-6">
+        <FormField
+          label="Report Cover Photos"
+          error={errors.photos?.reportCoverPhoto?.message}
+        >
+          <input
+            type="file"
+            accept="image/*"
+            multiple
+            {...register('photos.reportCoverPhoto')}
+            onChange={handleFileChange('reportCover')}
+            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:border file:border-gray-300 file:rounded-md file:text-sm file:bg-white file:text-gray-700 hover:file:bg-gray-100"
+          />
+          <p className="text-sm text-gray-500 mt-1">
+            Upload report Cover photo (front)
+          </p>
+          {counts.reportCover > 0 && (
+            <p className="text-xs text-green-600 mt-1">
+              {counts.reportCover} photo{counts.reportCover > 1 ? 's' : ''} selected
+            </p>
+          )}
+        </FormField>
         {/* Exterior */}
         <FormField
           label="Exterior Photos"

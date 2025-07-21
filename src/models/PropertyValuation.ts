@@ -183,6 +183,7 @@ const RoomFeaturesFixturesSchema = new Schema({
 
 
 const PhotosSchema = new Schema({
+  reportCoverPhoto: Schema.Types.Mixed,
   exteriorPhotos: Schema.Types.Mixed,
   interiorPhotos: Schema.Types.Mixed,
   additionalPhotos: Schema.Types.Mixed,

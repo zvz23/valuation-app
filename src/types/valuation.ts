@@ -256,6 +256,7 @@ export interface RoomFeaturesData {
 }
 
 export interface PhotosData {
+  reportCoverPhoto: FileList | null;
   exteriorPhotos: FileList | null;
   interiorPhotos: FileList | null;
   additionalPhotos: FileList | null;
