@@ -640,7 +640,7 @@ export const LocationSection: React.FC<SectionProps> = ({
 
   const getMapUrl = () => {
     if (!fullAddress || !config.googleMapsApiKey) return '';
-    return `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(fullAddress)}&zoom=16&size=600x400&maptype=terrain&markers=color:red%7C${encodeURIComponent(fullAddress)}&key=${config.googleMapsApiKey}`;
+    return `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(fullAddress)}&zoom=14&size=600x400&maptype=terrain&markers=color:red%7C${encodeURIComponent(fullAddress)}&key=${config.googleMapsApiKey}`;
   };
 
   const hasBeenFetched = lastFetchedAddress === fullAddress && Object.keys(fetchedData).length > 0;
