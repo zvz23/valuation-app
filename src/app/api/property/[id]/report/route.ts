@@ -7,6 +7,33 @@ import path from 'path';
 import os from 'os';
 import { uploadToOneDrive } from '@/lib/onedrive';
 import { generatePDFReport } from '@/lib/pdf';
+import sharp from 'sharp';
+import { Buffer } from 'buffer';
+
+async function generateCustomMapImage(address: string, apiKey: string, fullAddressLabel: string): Promise<Buffer> {
+  const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(address)}&zoom=14&size=600x400&maptype=roadmap&markers=color:red%7C${encodeURIComponent(address)}&key=${apiKey}`;
+
+  const arrayBuffer = await fetch(mapUrl).then(res => res.arrayBuffer());
+
+  const nodeBuffer = Buffer.from(arrayBuffer); 
+
+  const svgText = `
+    <svg width="600" height="60">
+      <rect x="0" y="0" width="600" height="60" fill="white"/>
+      <text x="50%" y="50%" font-size="20" font-family="Arial" fill="black" text-anchor="middle" alignment-baseline="middle">
+        ${fullAddressLabel}
+      </text>
+    </svg>
+  `;
+
+  const finalBuffer = await sharp(nodeBuffer)
+    .extend({ top: 60, background: 'white' })
+    .composite([{ input: Buffer.from(svgText), top: 0, left: 0 }])
+    .png()
+    .toBuffer();
+
+  return finalBuffer;
+}
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   await connectDB();
   const { id } = await context.params;
@@ -102,6 +129,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     filloutSheet.getCell('B183').value = valuationDetails.improvements || '';
     filloutSheet.getCell('B184').value = valuationDetails.marketValue || '';
 
+
+
     // 🧹 Recreate Photos Sheet
     const photoSheet = workbook.getWorksheet('Photos');
     if (!photoSheet) {
@@ -113,6 +142,21 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     const interiorPhotos = photos.interiorPhotos || [];
     const additionalPhotos = photos.additionalPhotos || [];
     const reportCoverPhoto = photos.reportCoverPhoto || [];
+
+    const fullAddressLabel = `${overview.addressStreet}, ${overview.addressSuburb}, ${overview.addressState} ${overview.addressPostcode}`;
+    const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+
+    const mapImageBuffer = await generateCustomMapImage(fullAddressLabel, apiKey, fullAddressLabel);
+
+    const imageId = workbook.addImage({
+      buffer: mapImageBuffer as any,
+      extension: 'png',
+    });
+
+    photoSheet.addImage(imageId, {
+    tl: { col: 2, row: 16 }, 
+    ext: { width: 550, height: 230 },
+  });
 
     // ✨ Total row capacity starting from AB4 down to AB34 = 31 rows
     const maxRows = 31;
@@ -159,6 +203,21 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     const exteriorPhotos1 = photos1.exteriorPhotos || [];
     const interiorPhotos1 = photos1.interiorPhotos || [];
     const additionalPhotos1 = photos1.additionalPhotos || [];
+
+    const fullAddressLabel1 = `${overview.addressStreet}, ${overview.addressSuburb}, ${overview.addressState} ${overview.addressPostcode}`;
+    const apiKey1 = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
+
+    const mapImageBuffer1 = await generateCustomMapImage(fullAddressLabel1, apiKey1, fullAddressLabel1);
+
+    const imageId1 = workbook.addImage({
+      buffer: mapImageBuffer1 as any,
+      extension: 'png',
+    });
+
+    valuationSummarySheet.addImage(imageId1, {
+    tl: { col: 29, row: 13 }, 
+    ext: { width: 550, height: 200 },
+  });
 
     // ✨ Total row capacity starting from AB4 down to AB34 = 31 rows
     const maxRows1 = 31;
