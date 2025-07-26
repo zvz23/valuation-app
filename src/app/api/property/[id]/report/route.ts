@@ -9,6 +9,7 @@ import { uploadToOneDrive } from '@/lib/onedrive';
 import { generatePDFReport } from '@/lib/pdf';
 import sharp from 'sharp';
 import { Buffer } from 'buffer';
+import { getOneDriveDownloadUrl, tokenManager } from '@/lib/onedrive-token';
 
 async function generateCustomMapImage(address: string, apiKey: string, fullAddressLabel: string): Promise<Buffer> {
   const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(address)}&zoom=14&size=600x400&maptype=roadmap&markers=color:red%7C${encodeURIComponent(address)}&key=${apiKey}`;
@@ -34,6 +35,7 @@ async function generateCustomMapImage(address: string, apiKey: string, fullAddre
 
   return finalBuffer;
 }
+
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   await connectDB();
   const { id } = await context.params;
@@ -46,8 +48,6 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     const templatePath = path.resolve(process.cwd(), 'public/templates/AAP-Report.xlsx');
     await workbook.xlsx.readFile(templatePath);
     workbook.calcProperties.fullCalcOnLoad = true;
-
-
 
     const filloutSheet = workbook.getWorksheet('Fillout');
     if (!filloutSheet) {
@@ -63,6 +63,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     const siteDetails = property.siteDetails || {};
     const ancillaryImprovements = property.ancillaryImprovements || {};
     const generalComments = property.generalComments || {};
+    
     filloutSheet.getCell('B2').value = overview.jobNumber || '';
     filloutSheet.getCell('C2').value = overview.closedByz || '';
     filloutSheet.getCell('D2').value = overview.propertyValuer || '';
@@ -129,9 +130,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     filloutSheet.getCell('B183').value = valuationDetails.improvements || '';
     filloutSheet.getCell('B184').value = valuationDetails.marketValue || '';
 
-
-
-    // 🧹 Recreate Photos Sheet
+    // 🧹 Photos Sheet
     const photoSheet = workbook.getWorksheet('Photos');
     if (!photoSheet) {
       throw new Error('Photos sheet not found in template');
@@ -146,118 +145,143 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     const fullAddressLabel = `${overview.addressStreet}, ${overview.addressSuburb}, ${overview.addressState} ${overview.addressPostcode}`;
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
+    // Generate and add map image
     const mapImageBuffer = await generateCustomMapImage(fullAddressLabel, apiKey, fullAddressLabel);
-
     const imageId = workbook.addImage({
       buffer: mapImageBuffer as any,
       extension: 'png',
     });
 
     photoSheet.addImage(imageId, {
-    tl: { col: 2, row: 16 }, 
-    ext: { width: 550, height: 230 },
-  });
+      tl: { col: 2, row: 16 }, 
+      ext: { width: 550, height: 230 },
+    });
 
-    // ✨ Total row capacity starting from AB4 down to AB34 = 31 rows
+    // Photo grid settings
     const maxRows = 31;
     const startingRow = 4;
-    const currentRow = startingRow;
+    const photosPerRow = 2;
+    const imageWidth = 250;
+    const imageHeight = 150;
 
-    photoSheet.getCell('C4').value  = {text: "View Report Cover Photo", hyperlink: reportCoverPhoto[0] || ''};
+    // Add report cover photo link
+    photoSheet.getCell('C4').value = {text: reportCoverPhoto[0], hyperlink: reportCoverPhoto[0] || ''};
 
-    // 👇 Fill as many photos as possible until AB34
+    // Process all photos
     const allPhotos: { type: string; url: string }[] = [
-  ...exteriorPhotos.map((url: string) => ({ type: 'Exterior', url })),
-  ...interiorPhotos.map((url: string) => ({ type: 'Interior', url })),
-  ...additionalPhotos.map((url: string) => ({ type: 'Additional', url })),
+      ...exteriorPhotos.map((url: string) => ({ type: 'Exterior', url })),
+      ...interiorPhotos.map((url: string) => ({ type: 'Interior', url })),
+      ...additionalPhotos.map((url: string) => ({ type: 'Additional', url })),
     ];
 
-
     for (let i = 0; i < Math.min(allPhotos.length, maxRows); i++) {
-      const row = startingRow + i;
-      const cell = `AB${row}`;
+      const rowIndex = Math.floor(i / photosPerRow);
+      const colIndex = i % photosPerRow;
+      
+      const col = 28 + (colIndex * 4);
+      const row = 5 + (rowIndex * 8);
 
-      photoSheet.getCell(cell).value = {
-        text: allPhotos[i].url,
-        hyperlink: allPhotos[i].url,
-      };
+      try {
+        // ✅ Use new token manager (no manual token needed)
+        const downloadUrl = await getOneDriveDownloadUrl(allPhotos[i].url);
+        const response = await fetch(downloadUrl);
+        const imageBuffer = await response.arrayBuffer();
+
+        const imageId = workbook.addImage({
+          buffer: Buffer.from(imageBuffer) as any,
+          extension: 'png', 
+        });
+
+        photoSheet.addImage(imageId, {
+          tl: { col: col, row: row }, 
+          ext: { width: imageWidth, height: imageHeight },
+        });
+      } catch (error) {
+        console.error(`Failed to embed image at position ${i}:`, error);
+      }
     }
-  
-    // 🧼 Optional: Clear remaining AB cells if total < 31 to avoid old data
+    
+    // Clear remaining cells
     for (let i = allPhotos.length; i < maxRows; i++) {
       const row = startingRow + i;
       photoSheet.getCell(`AB${row}`).value = '';
     }
-    // valuation-summary page
 
-    
-
+    // 📊 Valuation Summary Sheet
     const valuationSummarySheet = workbook.getWorksheet('Valuation Summary');
-
     if (!valuationSummarySheet) {
       throw new Error('Valuation sheet not found in template');
     }
 
-    const photos1 = property.photos || {};
-    
-    const exteriorPhotos1 = photos1.exteriorPhotos || [];
-    const interiorPhotos1 = photos1.interiorPhotos || [];
-    const additionalPhotos1 = photos1.additionalPhotos || [];
-
-    const fullAddressLabel1 = `${overview.addressStreet}, ${overview.addressSuburb}, ${overview.addressState} ${overview.addressPostcode}`;
-    const apiKey1 = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
-
-    const mapImageBuffer1 = await generateCustomMapImage(fullAddressLabel1, apiKey1, fullAddressLabel1);
-
+    // Generate and add map image for valuation summary
+    const mapImageBuffer1 = await generateCustomMapImage(fullAddressLabel, apiKey, fullAddressLabel);
     const imageId1 = workbook.addImage({
       buffer: mapImageBuffer1 as any,
       extension: 'png',
     });
 
     valuationSummarySheet.addImage(imageId1, {
-    tl: { col: 29, row: 13 }, 
-    ext: { width: 550, height: 200 },
-  });
+      tl: { col: 29, row: 13 }, 
+      ext: { width: 550, height: 200 },
+    });
 
-    // ✨ Total row capacity starting from AB4 down to AB34 = 31 rows
+    // ✨ Valuation Summary photos - FIXED positioning
     const maxRows1 = 31;
-    const startingRow1= 8;
-    const currentRow1 = startingRow1;
+    const photosPerRow1 = 2;
+    const imageWidth1 = 180; // Reduced size to fit better
+    const imageHeight1 = 90;  // Reduced size to fit better
 
-    // 👇 Fill as many photos as possible until AB34
     const allPhotos1: { type: string; url: string }[] = [
-  ...exteriorPhotos1.map((url: string) => ({ type: 'Exterior', url })),
-  ...interiorPhotos1.map((url: string) => ({ type: 'Interior', url })),
-  ...additionalPhotos1.map((url: string) => ({ type: 'Additional', url })),
+      ...exteriorPhotos.map((url: string) => ({ type: 'Exterior', url })),
+      ...interiorPhotos.map((url: string) => ({ type: 'Interior', url })),
+      ...additionalPhotos.map((url: string) => ({ type: 'Additional', url })),
     ];
 
+    for (let i = 0; i < Math.min(allPhotos1.length, maxRows1); i++) {
+      const rowIndex = Math.floor(i / photosPerRow1);
+      const colIndex = i % photosPerRow1;
+      
+      // ✅ FIXED: Better positioning to stay within page bounds
+      const col = 119 + (colIndex * 3); // More conservative starting position
+      const row = 7 + (rowIndex * 5);   // Tighter vertical spacing
 
-    for (let i = 0; i < Math.min(allPhotos1.length, maxRows); i++) {
-      const row = startingRow1 + i;
-      const cell = `DR${row}`;
+      try {
+        // ✅ Use new token manager
+        const downloadUrl = await getOneDriveDownloadUrl(allPhotos1[i].url);
+        const response = await fetch(downloadUrl);
+        const imageBuffer = await response.arrayBuffer();
 
-      valuationSummarySheet.getCell(cell).value = {
-        text: 'View Photo ' + (i + 1),
-        hyperlink: allPhotos1[i].url,
-      };
+        const imageId = workbook.addImage({
+          buffer: Buffer.from(imageBuffer) as any,
+          extension: 'png', 
+        });
+
+        valuationSummarySheet.addImage(imageId, {
+          tl: { col: col, row: row }, 
+          ext: { width: imageWidth1, height: imageHeight1 },
+        });
+      } catch (error) {
+        console.error(`Failed to embed valuation summary image at position ${i}:`, error);
+      }
     }
-  
-    // 🧼 Optional: Clear remaining AB cells if total < 31 to avoid old data
+
+    // Clear remaining cells in valuation summary
     for (let i = allPhotos1.length; i < maxRows1; i++) {
-      const row = startingRow1 + i;
+      const row = startingRow + i;
       valuationSummarySheet.getCell(`DO${row}`).value = '';
     }
-    // report overview page
 
+    // 📋 Report Cover Sheet
     const reportOverviewSheet = workbook.getWorksheet('Report Cover');
     if (!reportOverviewSheet) {
       throw new Error('Report Cover sheet not found in template');
     }
 
-    const reportCoverPhoto1 = photos1.reportCoverPhoto || [];
-
-    reportOverviewSheet.getCell('Q13').value = {text: "View Report Cover Photo", hyperlink: reportCoverPhoto1[0] || ''};
-
+    // Add report cover photo link
+    reportOverviewSheet.getCell('Q13').value = {
+      text: "View Report Cover Photo", 
+      hyperlink: reportCoverPhoto[0] || ''
+    };
 
     // ✅ Save and return file
     const tempFilePath = path.join(os.tmpdir(), `${id}-valuation-report.xlsx`);
@@ -269,16 +293,24 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       originalname: `Valuation-Report-${id}.xlsx`,
     };
 
+    // Upload to OneDrive and generate PDF
     const oneDriveUrl = await uploadToOneDrive(file, id, 'Valuation-Report');
     const downloadBase64 = buffer.toString('base64');
     const pdfBuffer = await generatePDFReport(property); 
 
-      const pdfFile = {
-        buffer: pdfBuffer,
-        originalname: `Valuation-Report-${id}.pdf`,
-      };
+    const pdfFile = {
+      buffer: pdfBuffer,
+      originalname: `Valuation-Report-${id}.pdf`,
+    };
 
-      const pdfUrl = await uploadToOneDrive(pdfFile, id, 'Valuation-PDF');
+    const pdfUrl = await uploadToOneDrive(pdfFile, id, 'Valuation-PDF');
+
+    // Clean up temp file
+    try {
+      fs.unlinkSync(tempFilePath);
+    } catch (cleanupError) {
+      console.warn('Failed to cleanup temp file:', cleanupError);
+    }
 
     return NextResponse.json({
       success: true,
@@ -287,8 +319,37 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       download: downloadBase64,
       filename: `Valuation-Report-${id}.xlsx`,
     });
+
   } catch (err: any) {
     console.error('Excel Report Error:', err);
-    return NextResponse.json({ error: 'Failed to generate report', message: err.message }, { status: 500 });
+    
+    // ✅ Enhanced error handling for different error types
+    if (err.message.includes('token') || err.message.includes('401') || err.message.includes('Authentication')) {
+      return NextResponse.json({ 
+        error: 'Authentication failed. Please check OneDrive configuration.', 
+        message: err.message,
+        suggestion: 'Try running the setup script again or check your environment variables.'
+      }, { status: 401 });
+    }
+    
+    if (err.message.includes('Template') || err.message.includes('sheet not found')) {
+      return NextResponse.json({ 
+        error: 'Template file error', 
+        message: err.message,
+        suggestion: 'Ensure the Excel template file exists and has the required sheets.'
+      }, { status: 400 });
+    }
+    
+    if (err.message.includes('Property not found')) {
+      return NextResponse.json({ 
+        error: 'Property not found', 
+        message: err.message 
+      }, { status: 404 });
+    }
+    
+    return NextResponse.json({ 
+      error: 'Failed to generate report', 
+      message: err.message 
+    }, { status: 500 });
   }
 }
