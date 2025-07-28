@@ -347,7 +347,10 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     
     // Write the Excel file with proper error handling
     try {
-      await workbook.xlsx.writeFile(tempExcelPath);
+      const buffer = await workbook.xlsx.writeBuffer() as any;
+
+      // Save buffer to file
+      fs.writeFileSync(tempExcelPath, buffer);
       
       // Wait a bit for file system to settle
       await new Promise(resolve => setTimeout(resolve, 1000));
