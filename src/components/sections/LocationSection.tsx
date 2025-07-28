@@ -575,10 +575,10 @@ export const LocationSection: React.FC<SectionProps> = ({
       );
       const stateName = stateComponent?.long_name || '';
 
-        const wikiDescription = await fetchSuburbDescriptionFromWikipedia(suburbName,stateName);
+      const wikiDescription = await fetchSuburbDescriptionFromWikipedia(suburbName,stateName);
       const description = wikiDescription || `Located in the established residential area of ${suburbName}`;
       const description2 = 'Well-connected location with access to local amenities and transport infrastructure';
-
+      
       
         newFetchedData.suburbInfo = {
           description,

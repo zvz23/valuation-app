@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { uploadToOneDrive } from '@/lib/onedrive';
-import { generatePDFReport } from '@/lib/pdf';
+import { generatePDFUsingWin32 } from '@/lib/pdf'; // ✅ Win32 PDF function
 import sharp from 'sharp';
 import { Buffer } from 'buffer';
 import { getOneDriveDownloadUrl, tokenManager } from '@/lib/onedrive-token';
@@ -164,8 +164,36 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     const imageWidth = 250;
     const imageHeight = 150;
 
-    // Add report cover photo link
-    photoSheet.getCell('C4').value = {text: reportCoverPhoto[0], hyperlink: reportCoverPhoto[0] || ''};
+    // Add report cover photo as actual image instead of hyperlink
+    if (reportCoverPhoto && reportCoverPhoto.length > 0) {
+      try {
+        // ✅ Use new token manager to get downloadable URL
+        const downloadUrl = await getOneDriveDownloadUrl(reportCoverPhoto[0]);
+        const response = await fetch(downloadUrl);
+        const imageBuffer = await response.arrayBuffer();
+
+        const reportCoverImageId = workbook.addImage({
+          buffer: Buffer.from(imageBuffer) as any,
+          extension: 'png', 
+        });
+
+        // Add image to cell C4 position (similar to other photos)
+        photoSheet.addImage(reportCoverImageId, {
+          tl: { col: 2, row: 3 }, // C4 cell position (col 2 = C, row 3 = 4 in 0-based indexing)
+          ext: { width: 300, height: 300 }, // Adjust size as needed
+        });
+      } catch (error) {
+        console.error('Failed to embed report cover photo:', error);
+        // Fallback to hyperlink if image embedding fails
+        photoSheet.getCell('C4').value = {
+          text: "View Report Cover Photo", 
+          hyperlink: reportCoverPhoto[0] || ''
+        };
+      }
+    } else {
+      // Clear the cell if no photo is available
+      photoSheet.getCell('C4').value = '';
+    }
 
     // Process all photos
     const allPhotos: { type: string; url: string }[] = [
@@ -277,47 +305,188 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       throw new Error('Report Cover sheet not found in template');
     }
 
-    // Add report cover photo link
-    reportOverviewSheet.getCell('Q13').value = {
-      text: "View Report Cover Photo", 
-      hyperlink: reportCoverPhoto[0] || ''
-    };
+    if (reportCoverPhoto && reportCoverPhoto.length > 0) {
+      try {
+        // ✅ Use new token manager to get downloadable URL
+        const downloadUrl = await getOneDriveDownloadUrl(reportCoverPhoto[0]);
+        const response = await fetch(downloadUrl);
+        const imageBuffer = await response.arrayBuffer();
 
-    // ✅ Save and return file
-    const tempFilePath = path.join(os.tmpdir(), `${id}-valuation-report.xlsx`);
-    await workbook.xlsx.writeFile(tempFilePath);
+        const reportCoverImageId = workbook.addImage({
+          buffer: Buffer.from(imageBuffer) as any,
+          extension: 'png', 
+        });
 
-    const buffer = fs.readFileSync(tempFilePath);
+        // Add image to Report Cover sheet
+        reportOverviewSheet.addImage(reportCoverImageId, {
+          tl: { col: 15, row: 7 }, 
+          ext: { width: 300, height: 300 }, // Adjust size as needed
+        });
+      } catch (error) {
+        console.error('Failed to embed report cover photo:', error);
+        // Fallback to hyperlink if image embedding fails
+        reportOverviewSheet.getCell('Q13').value = {
+          text: "View Report Cover Photo", 
+          hyperlink: reportCoverPhoto[0] || ''
+        };
+      }
+    } else {
+      // Clear the cell if no photo is available
+      reportOverviewSheet.getCell('Q13').value = '';
+    }
+
+    // ✅ Save Excel file to temp directory first
+    // ✅ Save Excel file to temp directory with proper handling
+    const tempExcelPath = path.join(os.tmpdir(), `${id}-valuation-report-${Date.now()}.xlsx`);
+    
+    // Ensure the temp directory exists and is writable
+    const tempDir = path.dirname(tempExcelPath);
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+    
+    // Write the Excel file with proper error handling
+    try {
+      await workbook.xlsx.writeFile(tempExcelPath);
+      
+      // Wait a bit for file system to settle
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Verify the file was written correctly
+      if (!fs.existsSync(tempExcelPath)) {
+        throw new Error('Excel file was not created');
+      }
+      
+      const excelStats = fs.statSync(tempExcelPath);
+      console.log(`Excel file created: ${tempExcelPath}, size: ${excelStats.size} bytes`);
+      
+      if (excelStats.size === 0) {
+        throw new Error('Generated Excel file is empty');
+      }
+
+      // Set file permissions to ensure Excel can access it
+      try {
+        fs.chmodSync(tempExcelPath, 0o666); // Read/write for all users
+        console.log('File permissions set successfully');
+      } catch (chmodError) {
+        console.warn('Could not set file permissions (this is usually fine on Windows):', chmodError);
+      }
+
+    } catch (writeError) {
+      console.error('Failed to write Excel file:', writeError);
+      if (writeError instanceof Error) {
+        throw new Error(`Failed to create Excel file: ${writeError.message}`);
+      } else {
+        throw new Error('Failed to create Excel file: Unknown error');
+      }
+    }
+
+    const buffer = fs.readFileSync(tempExcelPath);
     const file = {
       buffer,
       originalname: `Valuation-Report-${id}.xlsx`,
     };
 
-    // Upload to OneDrive and generate PDF
+    // Upload Excel to OneDrive
     const oneDriveUrl = await uploadToOneDrive(file, id, 'Valuation-Report');
     const downloadBase64 = buffer.toString('base64');
-    const pdfBuffer = await generatePDFReport(property); 
 
-    const pdfFile = {
-      buffer: pdfBuffer,
-      originalname: `Valuation-Report-${id}.pdf`,
-    };
+    // ✅ Generate PDF using Win32 method with improved error handling
+    let pdfBuffer: Buffer;
+    let pdfUrl: string = '';
+    let pdfGenerated: boolean = false;
 
-    const pdfUrl = await uploadToOneDrive(pdfFile, id, 'Valuation-PDF');
-
-    // Clean up temp file
     try {
-      fs.unlinkSync(tempFilePath);
-    } catch (cleanupError) {
-      console.warn('Failed to cleanup temp file:', cleanupError);
+      // Check if running on Windows
+      if (process.platform === 'win32') {
+        console.log('Using Win32 PDF generation...');
+        console.log(`Source Excel file: ${tempExcelPath}`);
+        
+        // ✅ Additional validation - try to re-open the Excel file with ExcelJS
+        try {
+          const testWorkbook = new ExcelJS.Workbook();
+          await testWorkbook.xlsx.readFile(tempExcelPath);
+          console.log('Excel file validation passed');
+          
+          // List available worksheets for debugging
+          testWorkbook.eachSheet((worksheet, sheetId) => {
+            console.log(`Available sheet: "${worksheet.name}" (ID: ${sheetId})`);
+          });
+          
+          // Close the test workbook properly
+          testWorkbook.removeWorksheet(testWorkbook.worksheets[0]?.id);
+          
+        } catch (validationError) {
+          throw new Error(`Excel file validation failed: ${validationError}`);
+        }
+        
+        // Wait a bit more for any file locks to clear
+        console.log('Waiting for file system to settle...');
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        // Generate PDF with only specific sheets
+        pdfBuffer = await generatePDFUsingWin32(
+          tempExcelPath, 
+          '', 
+          ['Valuation Summary', 'Report Cover']
+        );
+        
+        console.log('Win32 PDF generated successfully');
+
+        // Upload PDF to OneDrive
+        const pdfFile = {
+          buffer: pdfBuffer,
+          originalname: `Valuation-Report-${id}.pdf`,
+        };
+
+        pdfUrl = await uploadToOneDrive(pdfFile, id, 'Valuation-PDF');
+        pdfGenerated = true;
+        console.log('PDF uploaded to OneDrive successfully');
+
+      } else {
+        console.log('Non-Windows system detected, skipping PDF generation...');
+        console.log('Win32 PDF generation only works on Windows with Microsoft Office installed');
+      }
+
+    } catch (pdfError: any) {
+      console.error('PDF generation failed:', pdfError);
+      console.log('Error details:', {
+        message: pdfError.message,
+        stack: pdfError.stack,
+        platform: process.platform,
+        excelFileExists: fs.existsSync(tempExcelPath),
+        excelFileSize: fs.existsSync(tempExcelPath) ? fs.statSync(tempExcelPath).size : 0,
+        tempPath: tempExcelPath
+      });
+      
+      // ✅ Continue without PDF if generation fails
+      console.log('Continuing without PDF generation...');
+      pdfUrl = ''; 
+      pdfGenerated = false;
     }
 
+    // ✅ Clean up temporary Excel file
+    try {
+      if (fs.existsSync(tempExcelPath)) {
+        fs.unlinkSync(tempExcelPath);
+        console.log('Temporary Excel file cleaned up');
+      }
+    } catch (cleanupError) {
+      console.warn('Failed to cleanup temp Excel file:', cleanupError);
+    }
+
+    // ✅ Return response with PDF status
     return NextResponse.json({
       success: true,
       reportUrl: oneDriveUrl,
-      pdfUrl: pdfUrl,
+      pdfUrl: pdfUrl, // Will be empty string if PDF generation failed
       download: downloadBase64,
       filename: `Valuation-Report-${id}.xlsx`,
+      pdfGenerated: pdfGenerated, // ✅ Indicate if PDF was generated
+      platform: process.platform, // ✅ For debugging
+      message: pdfGenerated 
+        ? 'Excel and PDF reports generated successfully' 
+        : 'Excel report generated successfully. PDF generation skipped (Windows with Office required).'
     });
 
   } catch (err: any) {
@@ -345,6 +514,16 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
         error: 'Property not found', 
         message: err.message 
       }, { status: 404 });
+    }
+
+    // ✅ PDF-specific error handling
+    if (err.message.includes('Win32') || err.message.includes('PowerShell')) {
+      return NextResponse.json({ 
+        error: 'PDF generation failed', 
+        message: err.message,
+        suggestion: 'Ensure you are running on Windows with Microsoft Office installed, or disable PDF generation.',
+        excelGenerated: true // Excel was still generated successfully
+      }, { status: 200 }); // Still return success since Excel was generated
     }
     
     return NextResponse.json({ 
