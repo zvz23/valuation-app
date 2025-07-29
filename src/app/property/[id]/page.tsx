@@ -338,22 +338,52 @@ const LocationPreview: React.FC<{ data: any; sectionKey?: string }> = ({ data })
   </div>
 );
 
-const RoomFeaturesPreview: React.FC<{ data: any; sectionKey?: string }> = ({ data }) => (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-fade-in">
-    <div className="space-y-2 p-4 bg-white rounded-lg border hover:border-blue-300 transition-all duration-300">
-      <div className="text-sm font-medium text-gray-600">Primary Category</div>
-      <div className="text-gray-900">{data?.primaryCategory || 'Not categorized'}</div>
+const RoomFeaturesPreview: React.FC<{ data: any; sectionKey?: string }> = ({ data }) => {
+  const rooms = data?.rooms || {};
+  const roomEntries = Object.entries(rooms);
+  
+  // Helper function to safely display array items
+  const displayArrayItems = (items: any, label: string) => {
+    if (!Array.isArray(items) || items.length === 0) return null;
+    const displayItems = items.slice(0, 2).join(', ');
+    const hasMore = items.length > 2 ? '...' : '';
+    return <div>{label}: {displayItems}{hasMore}</div>;
+  };
+  
+  return (
+    <div className="space-y-4 animate-fade-in">
+      {roomEntries.length > 0 ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {roomEntries.slice(0, 4).map(([roomName, roomData]: [string, any]) => (
+            <div key={roomName} className="space-y-2 p-4 bg-white rounded-lg border hover:border-blue-300 transition-all duration-300">
+              <div className="text-sm font-medium text-gray-600">{roomName}</div>
+              <div className="text-gray-900 text-sm">
+                {displayArrayItems(roomData?.pcItems, 'PC Items')}
+                {displayArrayItems(roomData?.extraItems, 'Features')}
+                {displayArrayItems(roomData?.flooringTypes, 'Flooring')}
+                {!roomData?.pcItems?.length && !roomData?.extraItems?.length && !roomData?.flooringTypes?.length && (
+                  <div className="text-gray-500 italic">No items configured</div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2 p-4 bg-white rounded-lg border hover:border-blue-300 transition-all duration-300">
+            <div className="text-sm font-medium text-gray-600">Room Configuration</div>
+            <div className="text-gray-900">No rooms configured yet</div>
+          </div>
+        </div>
+      )}
+      {roomEntries.length > 4 && (
+        <div className="text-sm text-gray-500 text-center">
+          And {roomEntries.length - 4} more rooms...
+        </div>
+      )}
     </div>
-    <div className="space-y-2 p-4 bg-white rounded-lg border hover:border-blue-300 transition-all duration-300">
-      <div className="text-sm font-medium text-gray-600">Key Features</div>
-      <div className="text-gray-900">
-        {data?.features?.length 
-          ? data.features.slice(0, 2).join(', ') + (data.features.length > 2 ? '...' : '')
-          : 'Not specified'}
-      </div>
-    </div>
-  </div>
-);
+  );
+};
 const PhotosPreview: React.FC<{ data: any; sectionKey?: string }> = ({ data }) => (
   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in">
     {['exteriorPhotos', 'interiorPhotos', 'additionalPhotos', 'reportCoverPhoto'].map((type, index) => (
@@ -697,7 +727,7 @@ export default function PropertyValuationForm() {
       valuationDetails: {},
       propertyDetails: {},
       locationAndNeighborhood: {},
-      roomFeaturesFixtures: {},
+      roomFeaturesFixtures: { rooms: {} },
       photos: {},
       propertyDescriptors: {},
       ancillaryImprovements: {},

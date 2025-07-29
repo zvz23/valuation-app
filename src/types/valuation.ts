@@ -210,32 +210,40 @@ export interface LocationData {
   schoolDistrict?: string;
 }
 
-export interface RoomFeaturesData {
-  // Categories
-  primaryCategory: string;
-  secondaryCategory?: string;
-  categoryDescription?: string;
-  
-  // Flooring
-  flooringTypes: string[];
-  flooringCondition?: string;
-  flooringAge?: string;
-  flooringNotes?: string;
-  
-  // Features and Fixtures
-  features: string[];
-  fixtures: string[];
-  featuresCondition?: string;
-  fixturesCondition?: string;
-  featuresFixturesNotes?: string;
-  
-  // PC Items (Personal Chattels)
+// Individual room data structure
+export interface IndividualRoomData {
   pcItems: string[];
+  extraItems: string[];
+  flooringTypes: string[];
   pcItemsCondition?: string;
+  extraItemsCondition?: string;
+  flooringCondition?: string;
+  notes?: string;
+}
+
+export interface RoomFeaturesData {
+  // Room-based structure - each room has its own features
+  rooms: Record<string, IndividualRoomData>;
+  
+  // Global notes and values
+  featuresFixturesNotes?: string;
   pcItemsValue?: string;
   pcItemsNotes?: string;
   
   // Legacy fields (keeping for backward compatibility)
+  primaryCategory?: string;
+  secondaryCategory?: string;
+  categoryDescription?: string;
+  flooringTypes?: string[];
+  flooringCondition?: string;
+  flooringAge?: string;
+  flooringNotes?: string;
+  features?: string[];
+  fixtures?: string[];
+  featuresCondition?: string;
+  fixturesCondition?: string;
+  pcItems?: string[];
+  pcItemsCondition?: string;
   kitchen?: {
     fittedCupboards: boolean;
     appliances: string[];

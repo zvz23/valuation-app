@@ -145,7 +145,31 @@ const LocationAndNeighborhoodSchema = new Schema({
 
 
 
+// Individual room schema
+const IndividualRoomSchema = new Schema({
+  pcItems: [String],
+  extraItems: [String], 
+  flooringTypes: [String],
+  pcItemsCondition: String,
+  extraItemsCondition: String,
+  flooringCondition: String,
+  notes: String,
+}, { _id: false });
+
 const RoomFeaturesFixturesSchema = new Schema({
+  // Room-based structure - each room has its own features
+  rooms: {
+    type: Map,
+    of: IndividualRoomSchema,
+    default: {}
+  },
+  
+  // Global notes and values
+  featuresFixturesNotes: String,
+  pcItemsValue: String,
+  pcItemsNotes: String,
+  
+  // Legacy flat structure for backward compatibility
   primaryCategory: String,
   secondaryCategory: String,
   categoryDescription: String,
@@ -157,11 +181,8 @@ const RoomFeaturesFixturesSchema = new Schema({
   fixtures: [String],
   featuresCondition: String,
   fixturesCondition: String,
-  featuresFixturesNotes: String,
   pcItems: [String],
   pcItemsCondition: String,
-  pcItemsValue: String,
-  pcItemsNotes: String,
   kitchen: {
     fittedCupboards: Boolean,
     appliances: [String],

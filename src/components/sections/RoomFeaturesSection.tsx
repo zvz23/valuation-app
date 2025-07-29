@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { FormField, Input, Select, Checkbox, Textarea } from '../ui/FormField';
 import { SectionProps } from '@/types/valuation';
 import { ChevronDown, ChevronUp, Plus, X } from 'lucide-react';
@@ -75,10 +75,40 @@ export const RoomFeaturesSection: React.FC<SectionProps> = ({
 
   // State for which rooms exist in the property
   const [selectedRooms, setSelectedRooms] = useState<{[key: string]: string[]}>({});
+  const [roomsToInitialize, setRoomsToInitialize] = useState<string[]>([]);
+  const [roomsToRemove, setRoomsToRemove] = useState<string[]>([]);
 
   // State for custom items
   const [customItems, setCustomItems] = useState<{[key: string]: {pcItems: string[], extraItems: string[], flooringOptions: string[]}}>({});
   const [newCustomItem, setNewCustomItem] = useState<{[key: string]: {pcItems: string, extraItems: string, flooringOptions: string}}>({});
+
+  // Effect to initialize rooms
+  useEffect(() => {
+    if (roomsToInitialize.length > 0 && setValue) {
+      roomsToInitialize.forEach(room => {
+        setValue(`roomFeaturesFixtures.rooms.${room}` as any, {
+          pcItems: [],
+          extraItems: [],
+          flooringTypes: [],
+          pcItemsCondition: '',
+          extraItemsCondition: '',
+          flooringCondition: '',
+          notes: ''
+        });
+      });
+      setRoomsToInitialize([]);
+    }
+  }, [roomsToInitialize, setValue]);
+
+  // Effect to remove rooms
+  useEffect(() => {
+    if (roomsToRemove.length > 0 && setValue) {
+      roomsToRemove.forEach(room => {
+        setValue(`roomFeaturesFixtures.rooms.${room}` as any, undefined);
+      });
+      setRoomsToRemove([]);
+    }
+  }, [roomsToRemove, setValue]);
 
   const toggleSection = (section: keyof typeof expandedSections) => {
     setExpandedSections(prev => ({
@@ -93,11 +123,16 @@ export const RoomFeaturesSection: React.FC<SectionProps> = ({
       const isSelected = currentRooms.includes(room);
       
       if (isSelected) {
+        // Remove room from selected rooms and mark for removal
+        const updatedRooms = currentRooms.filter(r => r !== room);
+        setRoomsToRemove(current => [...current, room]);
         return {
           ...prev,
-          [categoryKey]: currentRooms.filter(r => r !== room)
+          [categoryKey]: updatedRooms
         };
       } else {
+        // Add room to selected rooms and mark for initialization
+        setRoomsToInitialize(current => [...current, room]);
         return {
           ...prev,
           [categoryKey]: [...currentRooms, room]
@@ -137,7 +172,7 @@ export const RoomFeaturesSection: React.FC<SectionProps> = ({
     }));
   };
 
-  const renderCustomInput = (categoryKey: string, itemType: 'pcItems' | 'extraItems' | 'flooringOptions', label: string) => (
+  const renderCustomInput = (categoryKey: string, itemType: 'pcItems' | 'extraItems' | 'flooringOptions', label: string, roomName?: string) => (
     <div className="mt-3 pt-3 border-t border-gray-100">
       <div className="flex gap-2">
         <Input
@@ -169,7 +204,10 @@ export const RoomFeaturesSection: React.FC<SectionProps> = ({
           {customItems[categoryKey][itemType].map((item, index) => (
             <div key={index} className="flex items-center justify-between bg-blue-50 px-3 py-2 rounded-md">
               <Checkbox
-                {...register(itemType === 'pcItems' ? 'roomFeaturesFixtures.pcItems' : itemType === 'extraItems' ? 'roomFeaturesFixtures.additionalFeatures' : 'roomFeaturesFixtures.flooringTypes')}
+                {...register(roomName 
+                  ? `roomFeaturesFixtures.rooms.${roomName}.${itemType === 'extraItems' ? 'extraItems' : itemType === 'flooringOptions' ? 'flooringTypes' : 'pcItems'}` as any
+                  : itemType === 'pcItems' ? 'roomFeaturesFixtures.pcItems' : itemType === 'extraItems' ? 'roomFeaturesFixtures.additionalFeatures' : 'roomFeaturesFixtures.flooringTypes'
+                )}
                 value={item}
                 label={item}
                 className="text-sm"
@@ -248,13 +286,13 @@ export const RoomFeaturesSection: React.FC<SectionProps> = ({
                             {category.pcItems.map((item: string) => (
                               <Checkbox
                                 key={`${room}-${item}`}
-                                {...register('roomFeaturesFixtures.pcItems')}
+                                {...register(`roomFeaturesFixtures.rooms.${room}.pcItems` as any)}
                                 value={item}
                                 label={item}
                               />
                             ))}
                           </div>
-                          {renderCustomInput(categoryKey, 'pcItems', 'PC Items')}
+                          {renderCustomInput(categoryKey, 'pcItems', 'PC Items', room)}
                         </div>
                       )}
 
@@ -266,13 +304,13 @@ export const RoomFeaturesSection: React.FC<SectionProps> = ({
                             {category.extraItems.map((item: string) => (
                               <Checkbox
                                 key={`${room}-${item}`}
-                                {...register('roomFeaturesFixtures.additionalFeatures')}
+                                {...register(`roomFeaturesFixtures.rooms.${room}.extraItems` as any)}
                                 value={item}
                                 label={item}
                               />
                             ))}
                           </div>
-                          {renderCustomInput(categoryKey, 'extraItems', 'Extra Items')}
+                          {renderCustomInput(categoryKey, 'extraItems', 'Extra Items', room)}
                         </div>
                       )}
 
@@ -284,13 +322,13 @@ export const RoomFeaturesSection: React.FC<SectionProps> = ({
                             {category.flooringOptions.map((flooring: string) => (
                               <Checkbox
                                 key={`${room}-${flooring}`}
-                                {...register('roomFeaturesFixtures.flooringTypes')}
+                                {...register(`roomFeaturesFixtures.rooms.${room}.flooringTypes` as any)}
                                 value={flooring}
                                 label={flooring}
                               />
                             ))}
                           </div>
-                          {renderCustomInput(categoryKey, 'flooringOptions', 'Flooring Options')}
+                          {renderCustomInput(categoryKey, 'flooringOptions', 'Flooring Options', room)}
                         </div>
                       )}
                     </div>
