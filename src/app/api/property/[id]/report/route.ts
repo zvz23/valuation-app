@@ -6,7 +6,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 import { uploadToOneDrive } from '@/lib/onedrive';
-import { generatePDFUsingWin32 } from '@/lib/pdf'; // ✅ Win32 PDF function
+import { generatePDFUsingWinAX } from '@/lib/pdf'; // ✅ WinAX Excel automation function
 import sharp from 'sharp';
 import { Buffer } from 'buffer';
 import { getOneDriveDownloadUrl, tokenManager } from '@/lib/onedrive-token';
@@ -18,23 +18,34 @@ async function generateCustomMapImage(address: string, apiKey: string, fullAddre
 
   const nodeBuffer = Buffer.from(arrayBuffer); 
 
-  const svgText = `
-    <svg width="600" height="60">
-      <rect x="0" y="0" width="600" height="60" fill="white"/>
-      <text x="50%" y="50%" font-size="20" font-family="Arial" fill="black" text-anchor="middle" alignment-baseline="middle">
+  // ✅ Create address text positioned directly above the red marker (no background)
+  const addressLabelSvg = `
+    <svg width="600" height="400">
+      <!-- Address text directly on map, positioned above center (where red marker is) -->
+      <text x="300" y="140" font-size="18" font-family="Arial, sans-serif" font-weight="bold" fill="#141414" text-anchor="middle" alignment-baseline="middle" stroke="#ffffff" stroke-width="1">
         ${fullAddressLabel}
       </text>
     </svg>
   `;
 
-  const finalBuffer = await sharp(nodeBuffer)
-    .extend({ top: 60, background: 'white' })
-    .composite([{ input: Buffer.from(svgText), top: 0, left: 0 }])
+  return await sharp(nodeBuffer)
+    .composite([{ 
+      input: Buffer.from(addressLabelSvg), 
+      top: 0, 
+      left: 0,
+      blend: 'over'
+    }])
     .png()
     .toBuffer();
-
-  return finalBuffer;
 }
+
+function formatImprovementName(key: string): string {
+  // Convert camelCase or custom keys to readable format
+  return key
+    .replace(/([A-Z])/g, ' $1') // Insert space before capitals
+    .replace(/^./, str => str.toUpperCase()); // Capitalize first letter
+}
+
 
 export async function GET(req: NextRequest, context: { params: Promise<{ id: string }> }) {
   await connectDB();
@@ -125,7 +136,12 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     filloutSheet.getCell('B78').value = propertyDescriptors.defects || '';
     filloutSheet.getCell('B83').value = ancillaryImprovements.driveway || '';
     filloutSheet.getCell('B84').value = ancillaryImprovements.fencing || '';
-    filloutSheet.getCell('B85').value = ancillaryImprovements.otherImprovements || '';
+    const selectedImprovements = Object.entries(ancillaryImprovements.improvements)
+      .filter(([_, value]) => typeof value === 'object' && value !== null && 'selected' in value && (value as { selected: boolean }).selected)
+      .map(([key]) => formatImprovementName(key))
+      .join(', ');
+
+    filloutSheet.getCell('B85').value = selectedImprovements || '';
     filloutSheet.getCell('B88').value = roomFeaturesFixtures?.rooms?.["Bedroom 1"]?.extraItems?.join(", ") || '';
     filloutSheet.getCell('B89').value = roomFeaturesFixtures?.rooms?.["Bedroom 2"]?.extraItems?.join(", ") || '';
     filloutSheet.getCell('B90').value = roomFeaturesFixtures?.rooms?.["Bedroom 3"]?.extraItems?.join(", ") || '';
@@ -202,8 +218,10 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 
     photoSheet.addImage(imageId, {
       tl: { col: 2, row: 16 }, 
-      ext: { width: 550, height: 230 },
+      ext: { width: 558, height: 200 },
     });
+    
+    console.log(`✅ Google Maps image embedded: ${mapImageBuffer.length} bytes`);
 
     // Photo grid settings
     const maxRows = 31;
@@ -228,8 +246,10 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
         // Add image to cell C4 position (similar to other photos)
         photoSheet.addImage(reportCoverImageId, {
           tl: { col: 2, row: 3 }, // C4 cell position (col 2 = C, row 3 = 4 in 0-based indexing)
-          ext: { width: 300, height: 300 }, // Adjust size as needed
+          ext: { width: 690, height: 314 }, // Adjust size as needed
         });
+        
+        console.log(`✅ Report cover image embedded: ${imageBuffer.byteLength} bytes`);
       } catch (error) {
         console.error('Failed to embed report cover photo:', error);
         // Fallback to hyperlink if image embedding fails
@@ -272,6 +292,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
           tl: { col: col, row: row }, 
           ext: { width: imageWidth, height: imageHeight },
         });
+        
+        console.log(`✅ Photo ${i+1} embedded: ${imageBuffer.byteLength} bytes (${allPhotos[i].type})`);
       } catch (error) {
         console.error(`Failed to embed image at position ${i}:`, error);
       }
@@ -298,14 +320,15 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 
     valuationSummarySheet.addImage(imageId1, {
       tl: { col: 29, row: 13 }, 
-      ext: { width: 550, height: 200 },
+      ext: { width: 550, height: 230 },
     });
 
-    // ✨ Valuation Summary photos - FIXED positioning
+    // ✨ Valuation Summary photos - FULL WIDTH 3x2 GRID with minimal gaps
     const maxRows1 = 31;
-    const photosPerRow1 = 2;
-    const imageWidth1 = 180; // Reduced size to fit better
-    const imageHeight1 = 90;  // Reduced size to fit better
+    const photosPerRow1 = 2; // 2 photos per row
+    const targetImageWidth = 320;  // ✅ WIDER to fill to DH column
+    const targetImageHeight = 220; // ✅ SLIGHTLY TALLER height
+    const maxPhotosValuationSummary = 6; // ✅ LIMIT to only 6 photos (3 rows × 2 columns)
 
     const allPhotos1: { type: string; url: string }[] = [
       ...exteriorPhotos.map((url: string) => ({ type: 'Exterior', url })),
@@ -313,37 +336,119 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       ...additionalPhotos.map((url: string) => ({ type: 'Additional', url })),
     ];
 
-    for (let i = 0; i < Math.min(allPhotos1.length, maxRows1); i++) {
-      const rowIndex = Math.floor(i / photosPerRow1);
-      const colIndex = i % photosPerRow1;
+    // ✅ Function to crop/resize image to fit box perfectly
+    async function cropImageToFit(imageBuffer: ArrayBuffer, targetWidth: number, targetHeight: number): Promise<Buffer> {
+      try {
+        const image = sharp(Buffer.from(imageBuffer));
+        const metadata = await image.metadata();
+        
+        if (!metadata.width || !metadata.height) {
+          // If we can't get metadata, return original
+          return Buffer.from(imageBuffer);
+        }
+
+        const originalWidth = metadata.width;
+        const originalHeight = metadata.height;
+        const targetRatio = targetWidth / targetHeight;
+        const originalRatio = originalWidth / originalHeight;
+
+        let resizeWidth: number;
+        let resizeHeight: number;
+
+        // ✅ Implement your logic: smaller dimension takes 100%, other gets cropped
+        if (originalRatio > targetRatio) {
+          // Image is wider - fit to height, crop width
+          resizeHeight = targetHeight;
+          resizeWidth = Math.round(targetHeight * originalRatio);
+        } else {
+          // Image is taller - fit to width, crop height  
+          resizeWidth = targetWidth;
+          resizeHeight = Math.round(targetWidth / originalRatio);
+        }
+
+        // Resize and crop from center, then add black border
+        const croppedImage = await image
+          .resize(resizeWidth, resizeHeight)
+          .extract({
+            left: Math.max(0, Math.round((resizeWidth - targetWidth) / 2)),
+            top: Math.max(0, Math.round((resizeHeight - targetHeight) / 2)),
+            width: targetWidth,
+            height: targetHeight
+          });
+
+        // ✅ Add professional black border (2px on all sides)
+        const borderWidth = 2;
+        const processedImage = await croppedImage
+          .extend({
+            top: borderWidth,
+            bottom: borderWidth,
+            left: borderWidth,
+            right: borderWidth,
+            background: { r: 0, g: 0, b: 0, alpha: 1 } // Black border
+          })
+          .png()
+          .toBuffer();
+
+        console.log(`🖼️ Image processed: ${originalWidth}x${originalHeight} → ${targetWidth}x${targetHeight} + 2px black border`);
+        return processedImage;
+      } catch (error) {
+        console.warn('Failed to crop image, using original:', error);
+        return Buffer.from(imageBuffer);
+      }
+    }
+
+    // ✅ Render 6 photos in clean 3×2 grid
+    console.log(`📊 Valuation Summary: Rendering ${Math.min(allPhotos1.length, maxPhotosValuationSummary)} out of ${allPhotos1.length} total photos in 3×2 grid`);
+    
+    for (let i = 0; i < Math.min(allPhotos1.length, maxPhotosValuationSummary); i++) {
+      const rowIndex = Math.floor(i / photosPerRow1); // 0, 0, 1, 1, 2, 2
+      const colIndex = i % photosPerRow1;             // 0, 1, 0, 1, 0, 1
       
-      // ✅ FIXED: Better positioning to stay within page bounds
-      const col = 119 + (colIndex * 3); // More conservative starting position
-      const row = 7 + (rowIndex * 5);   // Tighter vertical spacing
+      // ✅ LARGE PHOTOS: Tight 3×2 layout like reference image
+      const startCol = 118;   // Starting column
+      const startRow = 7;     // Starting row
+      const colSpacing = 6;   // ✅ TIGHT spacing for large photos
+      const rowSpacing = 9;   // ✅ TIGHT spacing for large photos
+      
+      const col = startCol + (colIndex * colSpacing);
+      const row = startRow + (rowIndex * rowSpacing);
+
+      console.log(`📍 Photo ${i+1}: Position (${col}, ${row}) - Row ${rowIndex+1}, Col ${colIndex+1}`);
 
       try {
-        // ✅ Use new token manager
+        // ✅ Download and crop image
         const downloadUrl = await getOneDriveDownloadUrl(allPhotos1[i].url);
         const response = await fetch(downloadUrl);
         const imageBuffer = await response.arrayBuffer();
 
+        // ✅ Crop image to fit perfectly in box
+        const croppedImageBuffer = await cropImageToFit(imageBuffer, targetImageWidth, targetImageHeight);
+
         const imageId = workbook.addImage({
-          buffer: Buffer.from(imageBuffer) as any,
+          buffer: croppedImageBuffer as any,
           extension: 'png', 
         });
 
+        // ✅ Account for border when placing image (border adds 4px total to each dimension)
+        const borderWidth = 2;
+        const finalImageWidth = targetImageWidth + (borderWidth * 2);
+        const finalImageHeight = targetImageHeight + (borderWidth * 2);
+        
         valuationSummarySheet.addImage(imageId, {
           tl: { col: col, row: row }, 
-          ext: { width: imageWidth1, height: imageHeight1 },
+          ext: { width: finalImageWidth, height: finalImageHeight },
         });
+        
+        console.log(`✅ Photo ${i+1} (${allPhotos1[i].type}) added to grid position ${rowIndex+1}×${colIndex+1} with black border`);
       } catch (error) {
         console.error(`Failed to embed valuation summary image at position ${i}:`, error);
       }
     }
 
-    // Clear remaining cells in valuation summary
-    for (let i = allPhotos1.length; i < maxRows1; i++) {
-      const row = startingRow + i;
+    // Clear remaining cells in valuation summary (based on 6 photo limit)
+    const photosRenderedInValuation = Math.min(allPhotos1.length, maxPhotosValuationSummary);
+    for (let i = photosRenderedInValuation; i < maxRows1; i++) {
+      const row = 4 + i; // Start from row 4
       valuationSummarySheet.getCell(`DO${row}`).value = '';
     }
 
@@ -367,8 +472,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 
         // Add image to Report Cover sheet
         reportOverviewSheet.addImage(reportCoverImageId, {
-          tl: { col: 15, row: 7 }, 
-          ext: { width: 300, height: 300 }, // Adjust size as needed
+          tl: { col: 14, row: 7 }, 
+          ext: { width: 670, height: 300 }, // Adjust size as needed
         });
       } catch (error) {
         console.error('Failed to embed report cover photo:', error);
@@ -442,69 +547,57 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     const oneDriveUrl = await uploadToOneDrive(file, id, 'Valuation-Report');
     const downloadBase64 = buffer.toString('base64');
 
-    // ✅ Generate PDF using Win32 method with improved error handling
+    // ✅ Generate PDF using WinAX Excel automation
     let pdfBuffer: Buffer;
     let pdfUrl: string = '';
     let pdfGenerated: boolean = false;
 
     try {
-      // Check if running on Windows
-      if (process.platform === 'win32') {
-        console.log('Using Win32 PDF generation...');
-        console.log(`Source Excel file: ${tempExcelPath}`);
+      console.log('Using WinAX Excel automation PDF generation...');
+      console.log(`Source Excel file: ${tempExcelPath}`);
+      
+      // ✅ Additional validation - try to re-open the Excel file with ExcelJS
+      try {
+        const testWorkbook = new ExcelJS.Workbook();
+        await testWorkbook.xlsx.readFile(tempExcelPath);
+        console.log('Excel file validation passed');
         
-        // ✅ Additional validation - try to re-open the Excel file with ExcelJS
-        try {
-          const testWorkbook = new ExcelJS.Workbook();
-          await testWorkbook.xlsx.readFile(tempExcelPath);
-          console.log('Excel file validation passed');
-          
-          // List available worksheets for debugging
-          testWorkbook.eachSheet((worksheet, sheetId) => {
-            console.log(`Available sheet: "${worksheet.name}" (ID: ${sheetId})`);
-          });
-          
-          // Close the test workbook properly
-          testWorkbook.removeWorksheet(testWorkbook.worksheets[0]?.id);
-          
-        } catch (validationError) {
-          throw new Error(`Excel file validation failed: ${validationError}`);
-        }
+        // List available worksheets for debugging
+        testWorkbook.eachSheet((worksheet, sheetId) => {
+          console.log(`Available sheet: "${worksheet.name}" (ID: ${sheetId})`);
+        });
         
-        // Wait a bit more for any file locks to clear
-        console.log('Waiting for file system to settle...');
-        await new Promise(resolve => setTimeout(resolve, 2000));
-        
-        // Generate PDF with only specific sheets
-        pdfBuffer = await generatePDFUsingWin32(
-          tempExcelPath, 
-          '', 
-          ['Valuation Summary', 'Report Cover']
-        );
-        
-        console.log('Win32 PDF generated successfully');
-
-        // Upload PDF to OneDrive
-        const pdfFile = {
-          buffer: pdfBuffer,
-          originalname: `Valuation-Report-${id}.pdf`,
-        };
-
-        pdfUrl = await uploadToOneDrive(pdfFile, id, 'Valuation-PDF');
-        pdfGenerated = true;
-        console.log('PDF uploaded to OneDrive successfully');
-
-      } else {
-        console.log('Non-Windows system detected, skipping PDF generation...');
-        console.log('Win32 PDF generation only works on Windows with Microsoft Office installed');
+      } catch (validationError) {
+        throw new Error(`Excel file validation failed: ${validationError}`);
       }
+      
+      // Wait a bit for any file locks to clear
+      console.log('Waiting for file system to settle...');
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Generate PDF using WinAX Excel automation (no user email needed - purely local)
+      pdfBuffer = await generatePDFUsingWinAX(
+        tempExcelPath,
+        ['Report Cover', 'Valuation Summary'] // Note: Order matters - Report Cover first, then Valuation Summary
+      );
+      
+      console.log('WinAX PDF generated successfully');
+
+      // Upload PDF to OneDrive
+      const pdfFile = {
+        buffer: pdfBuffer,
+        originalname: `Valuation-Report-${id}.pdf`,
+      };
+
+      pdfUrl = await uploadToOneDrive(pdfFile, id, 'Valuation-PDF');
+      pdfGenerated = true;
+      console.log('PDF uploaded to OneDrive successfully');
 
     } catch (pdfError: any) {
       console.error('PDF generation failed:', pdfError);
       console.log('Error details:', {
         message: pdfError.message,
         stack: pdfError.stack,
-        platform: process.platform,
         excelFileExists: fs.existsSync(tempExcelPath),
         excelFileSize: fs.existsSync(tempExcelPath) ? fs.statSync(tempExcelPath).size : 0,
         tempPath: tempExcelPath
@@ -534,10 +627,10 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       download: downloadBase64,
       filename: `Valuation-Report-${id}.xlsx`,
       pdfGenerated: pdfGenerated, // ✅ Indicate if PDF was generated
-      platform: process.platform, // ✅ For debugging
+      generationMethod: 'WinAX Excel Automation', // ✅ For debugging
       message: pdfGenerated 
-        ? 'Excel and PDF reports generated successfully' 
-        : 'Excel report generated successfully. PDF generation skipped (Windows with Office required).'
+        ? 'Excel and PDF reports generated successfully using WinAX Excel automation' 
+        : 'Excel report generated successfully. PDF generation failed (check WinAX/Excel configuration).'
     });
 
   } catch (err: any) {
@@ -568,11 +661,11 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     }
 
     // ✅ PDF-specific error handling
-    if (err.message.includes('Win32') || err.message.includes('PowerShell')) {
+    if (err.message.includes('WinAX') || err.message.includes('Excel.Application') || err.message.includes('ExportAsFixedFormat')) {
       return NextResponse.json({ 
         error: 'PDF generation failed', 
         message: err.message,
-        suggestion: 'Ensure you are running on Windows with Microsoft Office installed, or disable PDF generation.',
+        suggestion: 'Check your WinAX installation and ensure Microsoft Excel is properly installed and accessible. Try: npm install winax',
         excelGenerated: true // Excel was still generated successfully
       }, { status: 200 }); // Still return success since Excel was generated
     }

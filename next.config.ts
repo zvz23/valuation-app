@@ -58,7 +58,17 @@ const nextConfig: NextConfig = {
   },
  
   // External packages for server components
-  serverExternalPackages: ['bcryptjs'],
+  serverExternalPackages: ['bcryptjs', 'winax'],
+  
+  // Webpack configuration for native modules
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Exclude native modules from bundling
+      config.externals = config.externals || [];
+      config.externals.push('winax');
+    }
+    return config;
+  },
   
   // Disable X-Powered-By header
   poweredByHeader: false,
