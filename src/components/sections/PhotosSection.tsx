@@ -3,6 +3,7 @@ import { FormField } from '../ui/FormField';
 import { SectionProps } from '@/types/valuation';
 import { X } from 'lucide-react';
 import axios from 'axios';
+import Image from 'next/image';
 
 export const PhotosSection: React.FC<SectionProps> = ({ 
   data, 
@@ -126,13 +127,15 @@ export const PhotosSection: React.FC<SectionProps> = ({
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
           {photoArray.map((photoUrl: string, index: number) => (
             <div key={index} className="relative group">
-              <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
-                <img
-                  src={photoUrl}
-                  alt={`${title} ${index + 1}`}
-                  className="w-full h-full object-cover"
-                />
-              </div>
+                             <div className="aspect-square bg-gray-100 rounded-lg overflow-hidden">
+                 <Image
+                   src={photoUrl}
+                   alt={`${title} ${index + 1}`}
+                   width={200}
+                   height={200}
+                   className="w-full h-full object-cover"
+                 />
+               </div>
               <button
                 type="button"
                 onClick={() => handleDeletePhoto(photoType, photoUrl)}

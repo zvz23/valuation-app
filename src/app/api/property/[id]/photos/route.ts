@@ -85,8 +85,8 @@ export async function DELETE(req: NextRequest, context: { params: Promise<{ id: 
     
     // Double-check by re-fetching from database
     const verification = await PropertyValuation.findById(id).lean();
-    console.log(`🔍 Verification - Photos in DB after save:`, verification?.photos?.[photoType]?.length);
-    console.log(`🔍 Verification - Full photo data:`, verification?.photos?.[photoType]);
+    console.log(`🔍 Verification - Photos in DB after save:`, verification && typeof verification === 'object' && !Array.isArray(verification) ? verification?.photos?.[photoType]?.length : 'N/A');
+    console.log(`🔍 Verification - Full photo data:`, verification && typeof verification === 'object' && !Array.isArray(verification) ? verification?.photos?.[photoType] : 'N/A');
     
     console.log(`✅ Photo deleted successfully from ${photoType}: ${photoUrl}`);
     
