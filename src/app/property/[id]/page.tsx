@@ -386,7 +386,7 @@ const RoomFeaturesPreview: React.FC<{ data: any; sectionKey?: string }> = ({ dat
 };
 const PhotosPreview: React.FC<{ data: any; sectionKey?: string }> = ({ data }) => (
   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-fade-in">
-    {['exteriorPhotos', 'interiorPhotos', 'additionalPhotos', 'reportCoverPhoto'].map((type, index) => (
+    {['exteriorPhotos', 'interiorPhotos', 'additionalPhotos', 'reportCoverPhoto', 'grannyFlatPhotos'].map((type, index) => (
       <div key={index} className="space-y-2 p-4 bg-white rounded-lg border hover:border-blue-300 transition-all duration-300">
         <div className="text-sm font-medium text-gray-600">
           {type.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
@@ -810,7 +810,7 @@ export default function PropertyValuationForm() {
 
       const formData = new FormData();
       const photos = watchedData.photos;
-      for (const key of ['exteriorPhotos', 'interiorPhotos', 'additionalPhotos', 'reportCoverPhoto'] as const) {
+      for (const key of ['exteriorPhotos', 'interiorPhotos', 'additionalPhotos', 'reportCoverPhoto', 'grannyFlatPhotos'] as const) {
         const files = photos[key];
         if (files && files.length) {
           for (let i = 0; i < files.length; i++) {
@@ -847,10 +847,11 @@ export default function PropertyValuationForm() {
       data.photos &&
       (data.photos.exteriorPhotos?.length ||
         data.photos.interiorPhotos?.length ||
-        data.photos.additionalPhotos?.length)
+        data.photos.additionalPhotos?.length ||
+        data.photos.grannyFlatPhotos?.length)
     ) {
       const formData = new FormData();
-      (['exteriorPhotos', 'interiorPhotos', 'additionalPhotos', 'reportCoverPhoto'] as const).forEach((key) => {
+      (['exteriorPhotos', 'interiorPhotos', 'additionalPhotos', 'reportCoverPhoto', 'grannyFlatPhotos'] as const).forEach((key) => {
         const files = data.photos[key];
         if (files && files.length) {
           for (let i = 0; i < files.length; i++) {
@@ -884,12 +885,13 @@ export default function PropertyValuationForm() {
         data.photos.exteriorPhotos?.length ||
         data.photos.interiorPhotos?.length ||
         data.photos.additionalPhotos?.length ||
-        data.photos.reportCoverPhoto?.length
+        data.photos.reportCoverPhoto?.length ||
+        data.photos.grannyFlatPhotos?.length
       )
     ) {
       
       const formData = new FormData();
-      (['exteriorPhotos', 'interiorPhotos', 'additionalPhotos', 'reportCoverPhoto'] as const).forEach((key) => {
+      (['exteriorPhotos', 'interiorPhotos', 'additionalPhotos', 'reportCoverPhoto', 'grannyFlatPhotos'] as const).forEach((key) => {
         const files = data.photos[key];
         if (files && files.length) {
           for (let i = 0; i < files.length; i++) {

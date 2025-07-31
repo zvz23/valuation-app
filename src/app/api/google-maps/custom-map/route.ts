@@ -13,7 +13,7 @@ async function generateCustomMapImage(address: string, apiKey: string, fullAddre
   const addressLabelSvg = `
     <svg width="600" height="400">
       <!-- Address text directly on map, positioned above center (where red marker is) -->
-      <text x="300" y="140" font-size="18" font-family="Arial, sans-serif" font-weight="bold" fill="#141414" text-anchor="middle" alignment-baseline="middle" stroke="#ffffff" stroke-width="1">
+      <text x="300" y="140" font-size="18" font-family="Arial Narrow, sans-serif" font-weight="bold" fill="#141414" text-anchor="middle" alignment-baseline="middle" stroke="#ffffff" stroke-width="1">
         ${fullAddressLabel}
       </text>
     </svg>

@@ -132,13 +132,33 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
         return NextResponse.json({ error: 'Property not found' }, { status: 404 });
       }
 
+      console.log("📸 Existing photos structure:", existing.photos);
       const mergedPhotos = { ...(existing.photos || {}) };
+      console.log("📸 Initial merged photos:", mergedPhotos);
+      
       for (const [key, newUrls] of Object.entries(uploadedUrls)) {
-        mergedPhotos[key] = [...(mergedPhotos[key] || []), ...newUrls];
+        console.log(`📸 Processing ${key}:`, newUrls);
+        console.log(`📸 newUrls is array:`, Array.isArray(newUrls));
+        console.log(`📸 Existing ${key}:`, mergedPhotos[key]);
+        console.log(`📸 Existing ${key} is array:`, Array.isArray(mergedPhotos[key]));
+        
+        if (key === 'reportCoverPhoto') {
+          // For report cover photo, replace existing photo (single upload only)
+          mergedPhotos[key] = newUrls;
+          console.log(`✅ Report cover photo replaced: ${newUrls.length} photo(s)`);
+          console.log(`✅ Final ${key}:`, mergedPhotos[key]);
+        } else {
+          // For other photo types (exterior, interior, additional, grannyFlat), merge with existing photos (multiple upload)
+          const existingPhotos = Array.isArray(mergedPhotos[key]) ? mergedPhotos[key] : [];
+          mergedPhotos[key] = [...existingPhotos, ...newUrls];
+          console.log(`✅ Photos merged for ${key}: ${newUrls.length} new photo(s) added`);
+          console.log(`✅ Final ${key}:`, mergedPhotos[key]);
+        }
       }
 
       data.photos = mergedPhotos;
-      console.log("✅ Uploaded URLs merged into data:", mergedPhotos);
+      console.log("✅ Final uploaded URLs merged into data:", mergedPhotos);
+      console.log("📸 Final data.photos structure:", data.photos);
     }
 
     const updated = await PropertyValuation.findByIdAndUpdate(id, data, { new: true, upsert: true });

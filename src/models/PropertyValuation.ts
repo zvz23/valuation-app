@@ -1,4 +1,4 @@
-import mongoose, { Document } from 'mongoose';
+import mongoose, { Document, Schema } from 'mongoose';
 
 const OverviewSchema = new Schema({
   jobNumber: String,
@@ -94,8 +94,6 @@ const PropertyDetailsSchema = new Schema({
   roofType: String,
   wallConstruction: String,
 }, { _id: false });
-
-import { Schema } from 'mongoose';
 
 const DistanceObjectSchema = new Schema({
   name: String,
@@ -208,6 +206,7 @@ const PhotosSchema = new Schema({
   exteriorPhotos: Schema.Types.Mixed,
   interiorPhotos: Schema.Types.Mixed,
   additionalPhotos: Schema.Types.Mixed,
+  grannyFlatPhotos: Schema.Types.Mixed,
 }, { _id: false });
 
 

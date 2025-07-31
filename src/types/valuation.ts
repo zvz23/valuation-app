@@ -268,6 +268,7 @@ export interface PhotosData {
   exteriorPhotos: FileList | null;
   interiorPhotos: FileList | null;
   additionalPhotos: FileList | null;
+  grannyFlatPhotos: FileList | null;
 }
 
 export interface PropertyDescriptorsData {

@@ -51,6 +51,12 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
   await connectDB();
   const { id } = await context.params;
 
+  // ✅ Fixed dimensions for consistent image sizing with black borders
+  const reportCoverImageWidth = 670;  // Increased width to fill up to Y column
+  const reportCoverImageHeight = 300; // Slightly increased height
+  const locationMapImageWidth = 500;
+  const locationMapImageHeight = 190;
+
   try {
     const property: any = await PropertyValuation.findById(id).lean();
     if (!property) return NextResponse.json({ error: 'Property not found' }, { status: 404 });
@@ -205,23 +211,33 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     const interiorPhotos = photos.interiorPhotos || [];
     const additionalPhotos = photos.additionalPhotos || [];
     const reportCoverPhoto = photos.reportCoverPhoto || [];
+    const grannyFlatPhotos = photos.grannyFlatPhotos || [];
 
     const fullAddressLabel = `${overview.addressStreet}, ${overview.addressSuburb}, ${overview.addressState} ${overview.addressPostcode}`;
     const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
     // Generate and add map image
     const mapImageBuffer = await generateCustomMapImage(fullAddressLabel, apiKey, fullAddressLabel);
+    
+    // ✅ Crop map image to fixed dimensions with black border
+    const croppedMapBuffer = await cropImageToFit(mapImageBuffer, locationMapImageWidth, locationMapImageHeight);
+    
     const imageId = workbook.addImage({
-      buffer: mapImageBuffer as any,
+      buffer: croppedMapBuffer as any,
       extension: 'png',
     });
 
+    // Account for black border when placing image
+    const borderWidth = 2;
+    const finalMapWidth = locationMapImageWidth + (borderWidth * 2);
+    const finalMapHeight = locationMapImageHeight + (borderWidth * 2);
+
     photoSheet.addImage(imageId, {
       tl: { col: 2, row: 16 }, 
-      ext: { width: 558, height: 200 },
+      ext: { width: finalMapWidth, height: finalMapHeight },
     });
     
-    console.log(`✅ Google Maps image embedded: ${mapImageBuffer.length} bytes`);
+    console.log(`✅ Google Maps image embedded with fixed dimensions and black border: ${croppedMapBuffer.length} bytes`);
 
     // Photo grid settings
     const maxRows = 31;
@@ -238,18 +254,26 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
         const response = await fetch(downloadUrl);
         const imageBuffer = await response.arrayBuffer();
 
+        // ✅ Crop report cover image to fixed dimensions with black border
+        const croppedImageBuffer = await cropImageToFit(imageBuffer, reportCoverImageWidth, reportCoverImageHeight);
+
         const reportCoverImageId = workbook.addImage({
-          buffer: Buffer.from(imageBuffer) as any,
+          buffer: croppedImageBuffer as any,
           extension: 'png', 
         });
+
+        // Account for black border when placing image
+        const borderWidth = 2;
+        const finalImageWidth = reportCoverImageWidth + (borderWidth * 2);
+        const finalImageHeight = reportCoverImageHeight + (borderWidth * 2);
 
         // Add image to cell C4 position (similar to other photos)
         photoSheet.addImage(reportCoverImageId, {
           tl: { col: 2, row: 3 }, // C4 cell position (col 2 = C, row 3 = 4 in 0-based indexing)
-          ext: { width: 690, height: 314 }, // Adjust size as needed
+          ext: { width: finalImageWidth, height: finalImageHeight },
         });
         
-        console.log(`✅ Report cover image embedded: ${imageBuffer.byteLength} bytes`);
+        console.log(`✅ Report cover image embedded with fixed dimensions and black border: ${croppedImageBuffer.length} bytes`);
       } catch (error) {
         console.error('Failed to embed report cover photo:', error);
         // Fallback to hyperlink if image embedding fails
@@ -305,6 +329,8 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       photoSheet.getCell(`AB${row}`).value = '';
     }
 
+
+
     // 📊 Valuation Summary Sheet
     const valuationSummarySheet = workbook.getWorksheet('Valuation Summary');
     if (!valuationSummarySheet) {
@@ -313,15 +339,26 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
 
     // Generate and add map image for valuation summary
     const mapImageBuffer1 = await generateCustomMapImage(fullAddressLabel, apiKey, fullAddressLabel);
+    
+    // ✅ Crop map image to fixed dimensions with black border
+    const croppedMapBuffer1 = await cropImageToFit(mapImageBuffer1, locationMapImageWidth, locationMapImageHeight);
+    
     const imageId1 = workbook.addImage({
-      buffer: mapImageBuffer1 as any,
+      buffer: croppedMapBuffer1 as any,
       extension: 'png',
     });
 
+    // Account for black border when placing image
+    const borderWidth1 = 2;
+    const finalMapWidth1 = locationMapImageWidth + (borderWidth1 * 2);
+    const finalMapHeight1 = locationMapImageHeight + (borderWidth1 * 2);
+
     valuationSummarySheet.addImage(imageId1, {
       tl: { col: 29, row: 13 }, 
-      ext: { width: 550, height: 230 },
+      ext: { width: finalMapWidth1, height: finalMapHeight1 },
     });
+
+    console.log(`✅ Google Maps image embedded in Valuation Summary with fixed dimensions and black border: ${croppedMapBuffer1.length} bytes`);
 
     // ✨ Valuation Summary photos - FULL WIDTH 3x2 GRID with minimal gaps
     const maxRows1 = 31;
@@ -337,14 +374,14 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     ];
 
     // ✅ Function to crop/resize image to fit box perfectly
-    async function cropImageToFit(imageBuffer: ArrayBuffer, targetWidth: number, targetHeight: number): Promise<Buffer> {
+    async function cropImageToFit(imageBuffer: Buffer | ArrayBuffer, targetWidth: number, targetHeight: number): Promise<Buffer> {
       try {
-        const image = sharp(Buffer.from(imageBuffer));
+        const image = sharp(Buffer.isBuffer(imageBuffer) ? imageBuffer : Buffer.from(imageBuffer));
         const metadata = await image.metadata();
         
         if (!metadata.width || !metadata.height) {
           // If we can't get metadata, return original
-          return Buffer.from(imageBuffer);
+          return Buffer.isBuffer(imageBuffer) ? imageBuffer : Buffer.from(imageBuffer);
         }
 
         const originalWidth = metadata.width;
@@ -393,7 +430,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
         return processedImage;
       } catch (error) {
         console.warn('Failed to crop image, using original:', error);
-        return Buffer.from(imageBuffer);
+        return Buffer.isBuffer(imageBuffer) ? imageBuffer : Buffer.from(imageBuffer);
       }
     }
 
@@ -452,6 +489,79 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       valuationSummarySheet.getCell(`DO${row}`).value = '';
     }
 
+    // 🏠 Granny Flat Photos Section positioned to the LEFT for better page fit in Valuation Summary (only if granny flat photos exist)
+    if (grannyFlatPhotos && grannyFlatPhotos.length > 0) {
+      console.log(`🏠 Adding Granny Flat section as NEXT PAGE (to the left for better fit) in Valuation Summary with ${grannyFlatPhotos.length} photos`);
+      
+      // Position the granny flat section as the NEXT PAGE horizontally (to the left for better page fit)
+      // Photos section is around columns 118-130, so position Granny Flat to the left for better fit
+      const grannyFlatStartCol = 131; // Position to the left of Photos page for better page fit
+      const grannyFlatStartRow = 7; // Same row as Photos section (same vertical position)
+      const grannyFlatPhotosPerRow = 2; // Same 3x2 grid layout as photos
+      const maxGrannyFlatPhotos = 6; // Same limit as photos section
+      
+      // Add "Granny Flat" heading at the same row level as Photos heading
+      const grannyFlatHeadingRow = 5; // Same row level as Photos heading
+      valuationSummarySheet.getCell(grannyFlatHeadingRow, grannyFlatStartCol).value = 'Granny Flat';
+      valuationSummarySheet.getCell(grannyFlatHeadingRow, grannyFlatStartCol).font = { 
+        size: 14, 
+        bold: true,
+        name: 'Arial'
+      };
+      
+      console.log(`🏷️ Added "Granny Flat" heading at row ${grannyFlatHeadingRow}, col ${grannyFlatStartCol} (to the left for better page fit)`);
+      
+      // Start photos grid at same row level as Photos section
+      
+      // Process granny flat photos with same 3x2 grid layout as main photos
+      for (let i = 0; i < Math.min(grannyFlatPhotos.length, maxGrannyFlatPhotos); i++) {
+        const rowIndex = Math.floor(i / grannyFlatPhotosPerRow); // 0, 0, 1, 1, 2, 2  
+        const colIndex = i % grannyFlatPhotosPerRow;             // 0, 1, 0, 1, 0, 1
+        
+        // Same spacing as the main photos section
+        const colSpacing = 6;   // Same as photos section
+        const rowSpacing = 9;   // Same as photos section
+        
+        const col = grannyFlatStartCol + (colIndex * colSpacing);
+        const row = grannyFlatStartRow + (rowIndex * rowSpacing);
+
+        console.log(`📍 Granny Flat Photo ${i+1}: LEFT PAGE Position (${col}, ${row}) - Row ${rowIndex+1}, Col ${colIndex+1}`);
+
+        try {
+          // Download and crop granny flat image
+          const downloadUrl = await getOneDriveDownloadUrl(grannyFlatPhotos[i]);
+          const response = await fetch(downloadUrl);
+          const imageBuffer = await response.arrayBuffer();
+
+          // Crop image to fit perfectly in box (same as photos section)
+          const croppedImageBuffer = await cropImageToFit(imageBuffer, targetImageWidth, targetImageHeight);
+
+          const imageId = workbook.addImage({
+            buffer: croppedImageBuffer as any,
+            extension: 'png', 
+          });
+
+          // Account for border when placing image (same as photos section)
+          const borderWidth = 2;
+          const finalImageWidth = targetImageWidth + (borderWidth * 2);
+          const finalImageHeight = targetImageHeight + (borderWidth * 2);
+          
+          valuationSummarySheet.addImage(imageId, {
+            tl: { col: col, row: row }, 
+            ext: { width: finalImageWidth, height: finalImageHeight },
+          });
+          
+          console.log(`✅ Granny Flat Photo ${i+1} added to the LEFT of Photos at position ${rowIndex+1}×${colIndex+1} with black border`);
+        } catch (error) {
+          console.error(`Failed to embed granny flat image at position ${i}:`, error);
+        }
+      }
+      
+      console.log(`✅ Granny Flat section added to the LEFT for better page fit in Valuation Summary successfully with ${Math.min(grannyFlatPhotos.length, maxGrannyFlatPhotos)} photos`);
+    } else {
+      console.log(`📭 No granny flat photos found, skipping Granny Flat section in Valuation Summary`);
+    }
+
     // 📋 Report Cover Sheet
     const reportOverviewSheet = workbook.getWorksheet('Report Cover');
     if (!reportOverviewSheet) {
@@ -465,16 +575,26 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
         const response = await fetch(downloadUrl);
         const imageBuffer = await response.arrayBuffer();
 
+        // ✅ Crop report cover image to fixed dimensions with black border
+        const croppedReportCoverBuffer = await cropImageToFit(imageBuffer, reportCoverImageWidth, reportCoverImageHeight);
+
         const reportCoverImageId = workbook.addImage({
-          buffer: Buffer.from(imageBuffer) as any,
+          buffer: croppedReportCoverBuffer as any,
           extension: 'png', 
         });
+
+        // Account for black border when placing image
+        const borderWidth2 = 2;
+        const finalReportCoverWidth = reportCoverImageWidth + (borderWidth2 * 2);
+        const finalReportCoverHeight = reportCoverImageHeight + (borderWidth2 * 2);
 
         // Add image to Report Cover sheet
         reportOverviewSheet.addImage(reportCoverImageId, {
           tl: { col: 14, row: 7 }, 
-          ext: { width: 670, height: 300 }, // Adjust size as needed
+          ext: { width: finalReportCoverWidth, height: finalReportCoverHeight },
         });
+
+        console.log(`✅ Report cover image embedded in Report Cover sheet with fixed dimensions and black border: ${croppedReportCoverBuffer.length} bytes`);
       } catch (error) {
         console.error('Failed to embed report cover photo:', error);
         // Fallback to hyperlink if image embedding fails
@@ -576,9 +696,10 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
       await new Promise(resolve => setTimeout(resolve, 1000));
       
       // Generate PDF using WinAX Excel automation (no user email needed - purely local)
+      // Note: Granny Flat photos are now part of the Valuation Summary sheet, not a separate sheet
       pdfBuffer = await generatePDFUsingWinAX(
         tempExcelPath,
-        ['Report Cover', 'Valuation Summary'] // Note: Order matters - Report Cover first, then Valuation Summary
+        ['Report Cover', 'Valuation Summary'] // Granny Flat photos are included in Valuation Summary
       );
       
       console.log('WinAX PDF generated successfully');
