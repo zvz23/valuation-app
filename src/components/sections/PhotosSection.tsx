@@ -26,6 +26,7 @@ export const PhotosSection: React.FC<SectionProps> = ({
     grannyFlat: 0,
   });
   const [isDeleting, setIsDeleting] = useState<string | null>(null);
+  const [includeGrannyFlat, setIncludeGrannyFlat] = useState(false);
 
   const handleFileChange = (type: 'exterior' | 'interior' | 'additional' | 'reportCover' | 'grannyFlat') =>
     (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -262,30 +263,49 @@ export const PhotosSection: React.FC<SectionProps> = ({
         </FormField>
 
         {/* Granny Flat Photos Section */}
-        <FormField
-          label="Granny Flat Photos"
-          error={errors.photos?.grannyFlatPhotos?.message}
-        >
-          {/* Display existing granny flat photos */}
-          {renderPhotoGrid('grannyFlatPhotos', data?.photos?.grannyFlatPhotos, 'Current Granny Flat Photos')}
-          
-          <input
-            type="file"
-            accept="image/*"
-            multiple
-            {...register('photos.grannyFlatPhotos')}
-            onChange={handleFileChange('grannyFlat')}
-            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:border file:border-gray-300 file:rounded-md file:text-sm file:bg-white file:text-gray-700 hover:file:bg-gray-100"
-          />
-          <p className="text-sm text-gray-500 mt-1">
-            Upload granny flat photos (interior, exterior, etc.)
-          </p>
-          {counts.grannyFlat > 0 && (
-            <p className="text-xs text-green-600 mt-1">
-              {counts.grannyFlat} photo{counts.grannyFlat > 1 ? 's' : ''} selected
-            </p>
+        <div className="space-y-4">
+          {/* Include Granny Flat Checkbox */}
+          <div className="flex items-center space-x-3">
+            <input
+              type="checkbox"
+              id="includeGrannyFlat"
+              checked={includeGrannyFlat}
+              onChange={(e) => setIncludeGrannyFlat(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="includeGrannyFlat" className="text-sm font-medium text-gray-700">
+              Include Granny Flat
+            </label>
+          </div>
+
+          {/* Granny Flat Photos Section - Only show if checkbox is checked */}
+          {includeGrannyFlat && (
+            <FormField
+              label="Granny Flat Photos"
+              error={errors.photos?.grannyFlatPhotos?.message}
+            >
+              {/* Display existing granny flat photos */}
+              {renderPhotoGrid('grannyFlatPhotos', data?.photos?.grannyFlatPhotos, 'Current Granny Flat Photos')}
+              
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                {...register('photos.grannyFlatPhotos')}
+                onChange={handleFileChange('grannyFlat')}
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:border file:border-gray-300 file:rounded-md file:text-sm file:bg-white file:text-gray-700 hover:file:bg-gray-100"
+              />
+              <p className="text-sm text-gray-500 mt-1">
+                Upload granny flat photos (interior, exterior, etc.)
+              </p>
+              {counts.grannyFlat > 0 && (
+                <p className="text-xs text-green-600 mt-1">
+                  {counts.grannyFlat} photo{counts.grannyFlat > 1 ? 's' : ''} selected
+                </p>
+              )}
+            </FormField>
           )}
-        </FormField>
+        </div>
 
         {/* Guidelines */}
         <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
