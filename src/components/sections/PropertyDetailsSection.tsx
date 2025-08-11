@@ -532,12 +532,12 @@ export const PropertyDetailsSection: React.FC<SectionProps> = ({
 
               <FormField
                 label="Heritage Issue"
-                error={errors.propertyDetails?.permissibleUses?.message}
+                error={errors.propertyDetails?.heritageIssue?.message}
               >
                 <Input
-                  {...register('propertyDetails.permissibleUses')}
+                  {...register('propertyDetails.heritageIssue')}
                   placeholder="Enter heritage issues or restrictions"
-                  error={errors.propertyDetails?.permissibleUses?.message}
+                  error={errors.propertyDetails?.heritageIssue?.message}
                 />
               </FormField>
             </div>
