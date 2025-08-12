@@ -1,43 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import sharp from 'sharp';
 import { Buffer } from 'buffer';
 
-function escapeForSvg(text: string): string {
-  return text
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
-
-async function generateCustomMapImage(address: string, apiKey: string, fullAddressLabel: string): Promise<Buffer> {
+async function fetchStaticMap(address: string, apiKey: string): Promise<Buffer> {
   const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(address)}&zoom=14&size=600x400&maptype=roadmap&markers=color:red%7C${encodeURIComponent(address)}&key=${apiKey}`;
-
   const arrayBuffer = await fetch(mapUrl).then(res => res.arrayBuffer());
-
-  const nodeBuffer = Buffer.from(arrayBuffer); 
-
-  // ✅ Create address text positioned directly above the red marker (no background)
-  const safeLabel = escapeForSvg(fullAddressLabel);
-  const addressLabelSvg = `
-    <svg width="600" height="400" xmlns="http://www.w3.org/2000/svg">
-      <!-- Address text directly on map, positioned above center (where red marker is) -->
-      <text x="300" y="140" font-size="18" font-family="DejaVu Sans, Liberation Sans, Arial, Helvetica, sans-serif" font-weight="700" fill="#141414" text-anchor="middle" alignment-baseline="middle" stroke="#ffffff" stroke-width="1" paint-order="stroke fill" >
-        ${safeLabel}
-      </text>
-    </svg>
-  `;
-
-  return await sharp(nodeBuffer)
-    .composite([{ 
-      input: Buffer.from(addressLabelSvg), 
-      top: 0, 
-      left: 0,
-      blend: 'over'
-    }])
-    .png()
-    .toBuffer();
+  return Buffer.from(arrayBuffer);
 }
 
 export async function GET(request: NextRequest) {
@@ -58,8 +25,8 @@ export async function GET(request: NextRequest) {
   console.log(`Custom Map API: Generating custom map for address: ${address}`);
   
   try {
-    // Generate custom map image with address text overlay
-    const mapImageBuffer = await generateCustomMapImage(address, apiKey, address);
+    // Return Google Static Map image as-is (no text overlay) to avoid artifacts
+    const mapImageBuffer = await fetchStaticMap(address, apiKey);
     
     console.log(`Custom Map API: Generated map image (${mapImageBuffer.length} bytes)`);
     
