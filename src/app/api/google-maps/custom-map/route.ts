@@ -11,21 +11,21 @@ function escapeForSvg(text: string): string {
     .replace(/'/g, '&#39;');
 }
 
-async function fetchStaticMap(address: string, apiKey: string): Promise<Buffer> {
+async function generateCustomMapImage(address: string, apiKey: string, fullAddressLabel: string): Promise<Buffer> {
   const mapUrl = `https://maps.googleapis.com/maps/api/staticmap?center=${encodeURIComponent(address)}&zoom=14&size=600x400&maptype=roadmap&markers=color:red%7C${encodeURIComponent(address)}&key=${apiKey}`;
-  const arrayBuffer = await fetch(mapUrl).then(res => res.arrayBuffer());
-  return Buffer.from(arrayBuffer);
-}
 
-async function renderAddressOnMap(mapBuffer: Buffer, address: string): Promise<Buffer> {
-  const safe = escapeForSvg(address);
+  const arrayBuffer = await fetch(mapUrl).then(res => res.arrayBuffer());
+  const nodeBuffer = Buffer.from(arrayBuffer);
+
+  const safe = escapeForSvg(fullAddressLabel);
   const svg = `
     <svg width="600" height="400" xmlns="http://www.w3.org/2000/svg">
-      <text x="300" y="40" font-size="18" font-family="sans-serif" font-weight="600" fill="#111" text-anchor="middle">${safe}</text>
+      <text x="300" y="140" font-size="18" font-family="Arial Narrow, sans-serif" font-weight="bold" fill="#141414" text-anchor="middle" alignment-baseline="middle" stroke="#ffffff" stroke-width="1">${safe}</text>
     </svg>
   `;
-  return await sharp(mapBuffer)
-    .composite([{ input: Buffer.from(svg), top: 0, left: 0 }])
+
+  return await sharp(nodeBuffer)
+    .composite([{ input: Buffer.from(svg), top: 0, left: 0, blend: 'over' }])
     .png()
     .toBuffer();
 }
@@ -48,9 +48,8 @@ export async function GET(request: NextRequest) {
   console.log(`Custom Map API: Generating custom map for address: ${address}`);
   
   try {
-    // Fetch map and render address text inside the image above the marker
-    const baseMap = await fetchStaticMap(address, apiKey);
-    const mapImageBuffer = await renderAddressOnMap(baseMap, address);
+    // Generate custom map image with address text overlay (original behavior)
+    const mapImageBuffer = await generateCustomMapImage(address, apiKey, address);
     
     console.log(`Custom Map API: Generated map image (${mapImageBuffer.length} bytes)`);
     
@@ -58,7 +57,7 @@ export async function GET(request: NextRequest) {
     return new NextResponse(mapImageBuffer, {
       headers: {
         'Content-Type': 'image/png',
-        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Cache-Control': 'public, max-age=3600',
         'Content-Length': mapImageBuffer.length.toString(),
       },
     });

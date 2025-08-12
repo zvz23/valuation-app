@@ -535,7 +535,7 @@ export const PropertyDetailsSection: React.FC<SectionProps> = ({
                 error={errors.propertyDetails?.heritageIssue?.message}
               >
                 <Input
-                  {...register('propertyDetails.heritageIssue')}
+                  {...register('propertyDetails.permissibleUses')}
                   placeholder="Enter heritage issues or restrictions"
                   error={errors.propertyDetails?.heritageIssue?.message}
                 />
