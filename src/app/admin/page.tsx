@@ -196,7 +196,7 @@ export default function AdminDashboard() {
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 bg-clip-text text-transparent">
-                    Val AI Admin
+                    Smart Val Admin
                   </h1>
                   <p className="text-sm text-gray-600 font-medium">System Administration</p>
                 </div>

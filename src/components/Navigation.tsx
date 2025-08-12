@@ -69,7 +69,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             </div>
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-white drop-shadow-lg">Val AI</h1>
+            <h1 className="text-2xl font-bold text-white drop-shadow-lg">Smart Val</h1>
             <p className="text-blue-100 text-sm font-medium">Property Valuation</p>
           </div>
         </div>
