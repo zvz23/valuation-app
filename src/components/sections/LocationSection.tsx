@@ -666,10 +666,7 @@ export const LocationSection: React.FC<SectionProps> = ({
         <div className="bg-gray-100 rounded-lg p-4">
           {fullAddress && config.googleMapsApiKey ? (
             <div className="space-y-4">
-              <div className="flex items-center space-x-2 text-sm text-gray-600">
-                <MapPin className="w-4 h-4" />
-                <span>{fullAddress}</span>
-              </div>
+              {/* Address inside map only; hide header address row */}
               <div className="relative">
                 <img
                   src={getMapUrl()}
