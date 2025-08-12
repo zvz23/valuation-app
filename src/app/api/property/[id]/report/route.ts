@@ -150,7 +150,7 @@ export async function GET(req: NextRequest, context: { params: Promise<{ id: str
     filloutSheet.getCell('B78').value = propertyDescriptors.defects || '';
     filloutSheet.getCell('B83').value = ancillaryImprovements.driveway || '';
     filloutSheet.getCell('B84').value = ancillaryImprovements.fencing || '';
-    const selectedImprovements = Object.entries(ancillaryImprovements.improvements)
+    const selectedImprovements = Object.entries(ancillaryImprovements?.improvements || {})
       .filter(([_, value]) => typeof value === 'object' && value !== null && 'selected' in value && (value as { selected: boolean }).selected)
       .map(([key]) => formatImprovementName(key))
       .join(', ');
