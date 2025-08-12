@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SMARTVal - Property Valuation System",
+  title: "SMARTval - Property Valuation System",
   description: "Modern property valuation report generation system with comprehensive form-based data collection and professional reporting capabilities.",
 };
 
