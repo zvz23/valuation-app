@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the comprehensive security measures implemented in the Smart Val application to protect against common web vulnerabilities and ensure data security.
+This document outlines the comprehensive security measures implemented in the SMARTval application to protect against common web vulnerabilities and ensure data security.
 
 ## 🔐 Security Features Implemented
 

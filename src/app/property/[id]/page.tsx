@@ -1011,7 +1011,7 @@ export default function PropertyValuationForm() {
         <header className="relative z-10 bg-white/80 backdrop-blur-xl border-b border-white/20 shadow-xl px-6 py-4 sticky top-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-6">
-              {/* Smart Val Logo and Title */}
+              {/* SMARTval Logo and Title */}
               <div className="flex items-center space-x-4">
                 <div className="relative group cursor-pointer" onClick={handleGoHome}>
                   <div className="absolute inset-0 bg-gradient-to-r from-blue-500 to-blue-700 rounded-2xl blur-lg opacity-75 group-hover:opacity-100 transition-opacity duration-300"></div>
@@ -1021,7 +1021,7 @@ export default function PropertyValuationForm() {
                 </div>
                 <div className="cursor-pointer" onClick={handleGoHome}>
                   <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 bg-clip-text text-transparent drop-shadow-lg hover:from-blue-500 hover:via-blue-600 hover:to-blue-700 transition-all duration-300">
-                    Smart Val
+                    SMARTval
                   </h1>
                   <p className="text-gray-600 text-sm font-medium">Alliance Australia Property</p>
                 </div>

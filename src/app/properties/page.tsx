@@ -363,7 +363,7 @@ export default function PropertiesPage() {
               </div>
               <div className="cursor-pointer" onClick={handleGoHome}>
                 <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 bg-clip-text text-transparent drop-shadow-lg hover:from-blue-500 hover:via-blue-600 hover:to-blue-700 transition-all duration-300">
-                  Smart Val
+                  SMARTval
                 </h1>
                 <p className="text-gray-600 font-medium">Alliance Australia Property</p>
                 <div className="mt-2 h-1 w-24 bg-gradient-to-r from-blue-500 to-blue-700 rounded-full shadow-lg shadow-blue-500/30"></div>

@@ -190,7 +190,7 @@ export default function LoginPage() {
               </div>
             </div>
             <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 via-blue-700 to-blue-800 bg-clip-text text-transparent drop-shadow-lg mb-2">
-              Smart Val
+              SMARTval
             </h1>
             <p className="text-gray-600 font-medium mb-2">Alliance Australia Property</p>
             <div className="flex items-center justify-center text-sm text-gray-500">

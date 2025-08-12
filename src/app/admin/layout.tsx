@@ -1,8 +1,8 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Admin Dashboard | Smart Val',
-  description: 'Smart Val Admin Panel - System Administration',
+  title: 'Admin Dashboard | SMARTval',
+  description: 'SMARTval Admin Panel - System Administration',
   robots: 'noindex, nofollow', // Admin pages should not be indexed
 };
 
